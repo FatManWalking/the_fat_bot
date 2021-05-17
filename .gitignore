@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 
 # Own additions. Insert everything project specific here!
+lib/
