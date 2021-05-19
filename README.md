@@ -12,4 +12,4 @@ Contains the original source code of the project
 
 ### `\other`
 Hier könnte ihr Ordner stehen, für nur 3.99€ im Monat. Lass sie jetzt hier ihren Ordner anzeigen.
-@Dickermann 3.99 viel zu teuer du großkapitalist
+@Dickermann 3.99 viel zu teuer du großkapitalist. Das alles sollte öffentlich kostenlos zugänglich sein
