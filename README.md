@@ -1,7 +1,7 @@
 # the_fat_bot
 A reinforcement trained bot for doom, created as part of a machine learning research project at DHBW Mannheim
 
-The some files were written as jupyter notebooks while using jupytext to automatically convert them to python files to minimize meta files.
+Some files were written as jupyter notebooks while using jupytext to automatically convert them to python files to minimize meta files.
 
 ## How to navigate this project
 ### `\lib`
