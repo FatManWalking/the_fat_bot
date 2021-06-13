@@ -67,7 +67,6 @@ def preprocess(img):
     img = np.expand_dims(img, axis=0)
     return img
 
-
 def create_simple_game():
     print("Initializing doom...")
     game = vzd.DoomGame()
@@ -87,7 +86,6 @@ def create_simple_game():
 
     return game
 
-
 def test(game, agent):
     """Runs a test_episodes_per_epoch episodes and prints the result"""
     print("\nTesting...")
@@ -106,7 +104,6 @@ def test(game, agent):
     print("Results: mean: %.1f +/- %.1f," % (
         test_scores.mean(), test_scores.std()), "min: %.1f" % test_scores.min(),
           "max: %.1f" % test_scores.max())
-
 
 def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
     """
@@ -151,6 +148,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
             # performed actions are given as training examples to the agent after one batch is finished
             if global_step > agent.batch_size:
+                #TODO: Bugfix
                 agent.train()
 
             # finished the episode by completing the target
@@ -182,9 +180,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
 def map_supervised_action(last_action, actions):
     # This function takes the recorded action and maps it to a actions combination for the DuelQ Agent
-
-    
-
+    pass
 
 # old if __name__==__main__ of learning_pytorch.py
 def result():    
@@ -316,7 +312,10 @@ class DQNAgent:
         batch = np.array(batch, dtype=object)
 
         states = np.stack(batch[:, 0]).astype(float)
+
+        #TODO: Bugfix
         actions = batch[:, 1].astype(int)
+
         rewards = batch[:, 2].astype(float)
         next_states = np.stack(batch[:, 3]).astype(float)
         dones = batch[:, 4].astype(bool)
@@ -368,6 +367,8 @@ if __name__ == "__main__":
     game = create_simple_game()
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
+
+    print(actions)
 
     # Initialize our agent with the set parameters
     agent = DQNAgent(len(actions), lr=learning_rate, batch_size=batch_size,
