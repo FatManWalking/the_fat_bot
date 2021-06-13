@@ -28,11 +28,14 @@ train_epochs = 5
 learning_steps_per_epoch = 2000
 replay_memory_size = 10000
 
+# Tell the agent to get actions in a supervised manner
+supervised = True
+
 # NN learning settings
 batch_size = 64
 
 # Training regime
-test_episodes_per_epoch = 100
+test_episodes_per_epoch = 10#0
 
 # Other parameters
 frame_repeat = 12
@@ -120,9 +123,23 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
         print("\nEpoch #" + str(epoch + 1))
 
         for _ in trange(steps_per_epoch, leave=False):
+
+            # One episode is 1 action performed in the current state and the reward given
             state = preprocess(game.get_state().screen_buffer)
-            action = agent.get_action(state)
-            reward = game.make_action(actions[action], frame_repeat)
+
+            # Get the supervised action here
+            #TODO: Make sure every state gets a corresponding action somehow as transmitted in actions
+            game.advance_action()
+            last_action = game.get_last_action()
+            reward = game.get_last_reward()
+
+            map_supervised_action(last_action, actions)
+
+            print("Action:", last_action)
+            print("Reward:", reward)
+            print("=====================")
+
+            #reward = game.make_action(actions[action], frame_repeat)
             done = game.is_episode_finished()
 
             if not done:
@@ -130,16 +147,23 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
             else:
                 next_state = np.zeros((1, 30, 45)).astype(np.float32)
 
-            agent.append_memory(state, action, reward, next_state, done)
+            agent.append_memory(state, last_action, reward, next_state, done)
 
+            # performed actions are given as training examples to the agent after one batch is finished
             if global_step > agent.batch_size:
                 agent.train()
 
+            # finished the episode by completing the target
             if done:
                 train_scores.append(game.get_total_reward())
                 game.new_episode()
 
             global_step += 1
+        
+        print("Episode finished!")
+        print("Total reward:", game.get_total_reward())
+        print("************************")
+        sleep(2.0)
 
         agent.update_target_net()
         train_scores = np.array(train_scores)
@@ -156,15 +180,14 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
     game.close()
     return agent, game
 
+def map_supervised_action(last_action, actions):
+    # This function takes the recorded action and maps it to a actions combination for the DuelQ Agent
+
+    
+
+
+# old if __name__==__main__ of learning_pytorch.py
 def result():    
-
-    # Run the training for the set number of epochs
-    if not skip_learning:
-        agent, game = run(game, agent, actions, num_epochs=train_epochs, frame_repeat=frame_repeat,
-                          steps_per_epoch=learning_steps_per_epoch)
-
-        print("======================================")
-        print("Training finished. It's time to watch!")
 
     # Reinitialize the game with window visible
     game.close()
@@ -187,7 +210,65 @@ def result():
         sleep(1.0)
         score = game.get_total_reward()
         print("Total score: ", score)
-        
+
+class DuelQNet(nn.Module):
+    """
+    This is Duel DQN architecture.
+    see https://arxiv.org/abs/1511.06581 for more information.
+    """
+
+    def __init__(self, available_actions_count):
+        super(DuelQNet, self).__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=3, stride=2, bias=False),
+            nn.BatchNorm2d(8),
+            nn.ReLU()
+        )
+
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(8, 8, kernel_size=3, stride=2, bias=False),
+            nn.BatchNorm2d(8),
+            nn.ReLU()
+        )
+
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(8, 8, kernel_size=3, stride=1, bias=False),
+            nn.BatchNorm2d(8),
+            nn.ReLU()
+        )
+
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, bias=False),
+            nn.BatchNorm2d(16),
+            nn.ReLU()
+        )
+
+        self.state_fc = nn.Sequential(
+            nn.Linear(96, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1)
+        )
+
+        self.advantage_fc = nn.Sequential(
+            nn.Linear(96, 64),
+            nn.ReLU(),
+            nn.Linear(64, available_actions_count)
+        )
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.conv4(x)
+        x = x.view(-1, 192)
+        x1 = x[:, :96]  # input for the net to calculate the state value
+        x2 = x[:, 96:]  # relative advantage of actions in the state
+        state_value = self.state_fc(x1).reshape(-1, 1)
+        advantage_values = self.advantage_fc(x2)
+        x = state_value + (advantage_values - advantage_values.mean(dim=1).reshape(-1, 1))
+
+        return x
+
 class DQNAgent:
     def __init__(self, action_size, memory_size, batch_size, discount_factor, 
                  lr, load_model, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1):
@@ -215,6 +296,7 @@ class DQNAgent:
         self.opt = optim.SGD(self.q_net.parameters(), lr=self.lr)
 
     def get_action(self, state):
+
         if np.random.uniform() < self.epsilon:
             return random.choice(range(self.action_size))
         else:
@@ -294,26 +376,12 @@ if __name__ == "__main__":
 
     episodes = 10
 
-    for i in range(episodes):
-        print("Episode #" + str(i + 1))
+    # Run the training for the set number of epochs
+    if not skip_learning:
+        agent, game = run(game, agent, actions, num_epochs=train_epochs, frame_repeat=frame_repeat,
+                          steps_per_epoch=learning_steps_per_epoch)
 
-        game.new_episode()
-        while not game.is_episode_finished():
-            state = game.get_state()
-
-            game.advance_action()
-            last_action = game.get_last_action()
-            reward = game.get_last_reward()
-
-            print("State #" + str(state.number))
-            print("Game variables: ", state.game_variables)
-            print("Action:", last_action)
-            print("Reward:", reward)
-            print("=====================")
-
-        print("Episode finished!")
-        print("Total reward:", game.get_total_reward())
-        print("************************")
-        sleep(2.0)
+        print("======================================")
+        print("Training finished. It's time to watch!")
 
     game.close()
