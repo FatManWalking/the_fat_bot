@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+
 lib64/
 parts/
 sdist/
@@ -129,4 +129,5 @@ dmypy.json
 .pyre/
 
 # Own additions. Insert everything project specific here!
-lib/
+lib/tianshou
+lib/ViZDoom
