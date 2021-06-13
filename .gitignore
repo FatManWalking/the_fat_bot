@@ -131,3 +131,6 @@ dmypy.json
 # Own additions. Insert everything project specific here!
 lib/tianshou
 lib/ViZDoom
+
+source/lib/tianshou
+source/lib/ViZDoom
