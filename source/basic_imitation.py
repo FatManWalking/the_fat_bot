@@ -314,6 +314,8 @@ class DQNAgent:
         states = np.stack(batch[:, 0]).astype(float)
 
         #TODO: Bugfix
+        with open('Batch_Supervised.txt', 'w') as f:
+            f.write(str(batch))
         actions = batch[:, 1].astype(int)
 
         rewards = batch[:, 2].astype(float)
