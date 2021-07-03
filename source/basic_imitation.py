@@ -313,12 +313,13 @@ class DQNAgent:
 
         states = np.stack(batch[:, 0]).astype(float)
 
-        #TODO: Bugfix
-        with open('Batch_Supervised.txt', 'w') as f:
-            f.write(str(batch))
-        actions = batch[:, 1].astype(int)
+        actions = self.remap_actions(batch[:, 1])
+        # actions = batch[:, 1].astype(int)
 
         rewards = batch[:, 2].astype(float)
+        with open('batch_stack.txt', 'w') as f:
+            f.write(str(batch[:, 3]))
+        print(batch[:, 3].shape)
         next_states = np.stack(batch[:, 3]).astype(float)
         dones = batch[:, 4].astype(bool)
         not_dones = ~dones
@@ -352,6 +353,25 @@ class DQNAgent:
             self.epsilon *= self.epsilon_decay
         else:
             self.epsilon = self.epsilon_min
+    
+    def remap_actions(self, actions):
+
+        dic = {
+            tuple(list([0, 0, 0])) : 0,
+            tuple(list([0, 0, 1])) : 1,
+            tuple(list([0, 1, 0])) : 2,
+            tuple(list([0, 1, 1])) : 3,
+            tuple(list([1, 0, 0])) : 4,
+            tuple(list([1, 0, 1])) : 5,
+            tuple(list([1, 1, 0])) : 6,
+            tuple(list([1, 1, 1])) : 7
+        }
+
+        actions = [dic[tuple(action)] for action in actions]
+
+        return np.array(actions).astype(int)
+
+
 
 
 if __name__ == "__main__":
