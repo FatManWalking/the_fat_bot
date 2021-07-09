@@ -36,21 +36,8 @@ def preprocess(img):
     img = skimage.transform.resize(img, resolution)
     img = img.astype(np.float32)
     img = np.expand_dims(img, axis=0)
+
     return img
-
-
-def create_simple_game():
-    print("Initializing doom...")
-    game = vzd.DoomGame()
-    game.load_config(config_file_path)
-    game.set_window_visible(False)
-    game.set_mode(Mode.PLAYER)
-    game.set_screen_format(vzd.ScreenFormat.GRAY8)
-    game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-    game.init()
-    print("Doom initialized.")
-
-    return game
 
 
 def test(game, agent):
