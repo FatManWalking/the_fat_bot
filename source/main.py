@@ -12,7 +12,10 @@ And the Github https://github.com/amanda-lambda/drl-experiments/blob/master/ppo.
 """
 
 import argparse
-from ppo import PPOAgent 
+from ppo import *
+
+from vizdoom import Mode
+import vizdoom as vzd
 
 
 # Genric Options
@@ -91,7 +94,7 @@ parser.add_argument("--save_frequency",
                     default=1_000)
 
 
-def create_simple_game():
+def create_simple_game(config_file_path):
     """
     creates a simple run of the game to train the agent(s)
 
@@ -118,7 +121,7 @@ if __name__ == '__main__':
     options = parser.parse_args()
 
     # Initialize a game for each worker and actions
-    games = [create_simple_game() for i in range options.n_workers]
+    games = [create_simple_game(options.scene) for i in range options.n_workers]
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
     print(actions)
@@ -129,7 +132,7 @@ if __name__ == '__main__':
 
     # Run the training for the set number of epochs
     if options.mode == 'train':
-        #TODO: run has been moved to ppo file. Rewrite function accordingly
+        #TODO: run function in PPO.py
         agent, game = run(game, agent, actions, num_epochs=train_epochs, frame_repeat=frame_repeat,
                           steps_per_epoch=learning_steps_per_epoch)
 
