@@ -14,8 +14,12 @@ And the Github https://github.com/amanda-lambda/drl-experiments/blob/master/ppo.
 import argparse
 from ppo import PPOAgent 
 
-#TODO: Add cfg and wad paths to load
+
 # Genric Options
+parser.add_argument("--scene",
+                    type=str,
+                    help="run a specific .cfg and .wad",
+                    default="../scenarios/simpler_basic.cfg")
 parser.add_argument("--mode",
                     type=str,
                     help="run the network in train or evaluation mode",
@@ -50,7 +54,7 @@ parser.add_argument("--discount_factor",
                     help="discount factor used for discounting return",
                     default=0.99)
 
-# A2C/PPO specific parameters
+# PPO specific parameters
 parser.add_argument("--n_workers",
                     type=int,
                     help="number of actor critic workers",
