@@ -23,6 +23,9 @@ from tqdm import trange
 frame_repeat = 12
 resolution = (30, 45)
 
+# A named tuple to save information about steps that have been performed by the net and what came back from the net
+Experience = namedtuple('Experience', ('state', 'action', 'action_log_prob', 'value', 'reward', 'mask'))
+
 # Uses GPU if available
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda')
@@ -182,21 +185,39 @@ class ActorCritic(nn.Module):
     
     def act(self, x):
         """
-        does things
+        TODO: add docstring
 
         Input:
             x
         """
-        pass
+        # Forward pass
+        values, action_logits = self.forward(x)
+        probs = self.softmax(action_logits)
+        log_probs = self.logsoftmax(action_logits)
+
+        # Choose action stochastically
+        actions = probs.multinomial(1)
+
+        # Evaluate action
+        action_log_probs = log_probs.gather(1, actions)
+        return values, actions, action_log_probs
 
     def evaluate_action(self, x, action):
         """
-        does other things
+        TODO: Add docstring
         """
-        pass
+        # Forward pass 
+        value, action_logits = self.forward(x)
+        probs = self.softmax(action_logits)
+        log_probs = self.logsoftmax(action_logits)
+
+        # Evaluate actions
+        action_log_probs = log_probs.gather(1, actions)
+        dist_entropy = -(log_probs * probs).sum(-1).mean()
+        return value, action_log_probs, dist_entropy
 
 class PPOAgent:
-    # This is nicely fitted to PPO and argparse now
+
     def __init__(self, options, action_size):
         
         self.opt = options
@@ -204,7 +225,7 @@ class PPOAgent:
         self.memory = deque(maxlen=opt.replay_memory_size)
         self.criterion = nn.MSELoss()
 
-        self.ppo = ActorCritic(action_size).to(DEVICE)
+        self.ppo = ActorCritic(action_size)
 
         if self.opt.weights_dir != '':
             print("Loading model from: ", self.opt.weights_dir)
@@ -212,23 +233,80 @@ class PPOAgent:
             
         self.opt = optim.Adam(self.ppo.parameters(), lr=self.opt.learning_rate)
 
-    #TODO: Unchanged starting here
-    def get_action(self, state):
-        if np.random.uniform() < self.epsilon:
-            return random.choice(range(self.action_size))
-        else:
-            state = np.expand_dims(state, axis=0)
-            state = torch.from_numpy(state).float().to(DEVICE)
-            action = torch.argmax(self.q_net(state)).item()
-            return action
-
-    def update_target_net(self):
-        self.target_net.load_state_dict(self.q_net.state_dict())
-
-    def append_memory(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
-
+        self.ppo.to(DEVICE)
+    
+    def append_memory(self, states, actions, action_log_probs, values, rewards, masks):
+        self.memory.append((states, actions, action_log_probs, values, rewards, masks))
+    
+    # TODO: not fitted for DOOM yet. Last change marked
     def train(self):
+        """
+        TODO: add docstring
+    
+        """
+        # Episode length: How many episode are played by each worker
+        episode_lengths = np.zeros(self.opt.n_workers)
+
+        # Get a inital state of the game without performing any actions
+        initial_actions = np.zeros(self.opt.n_workers) # TODO: fit this to DOOM
+        states, _, _ = self.env_step(None, initial_actions) # Agent does a step in the enviroment
+
+        # Start an episode
+        for eps_num in range(1, self.opt.n_train_iterations):
+
+            # Perform a forward pass
+            values, actions, action_log_probs = self.ppo.act(states)
+
+            # Perform the retrieved action that came back from the forward pass
+            next_state, rewards, dones = self.env_step(states, actions)
+            masks = torch.FloatTensor([[0.0] if done else [1.0] for done in dones])
+
+            # Save experience to buffer
+            self.append_memory(
+                states.data, actions.data, action_log_probs.data, values.data, rewards, masks
+            )
+
+            # Perform optimization #TODO: Check alternative for optimize_model
+            if eps_num % self.opt.buffer_update_freq == 0:
+                loss, value_loss, action_loss, entropy_loss = self.optimize_model()
+                # Reset memory
+                self.memory = []
+
+            # Log episode length
+            for worker in range(self.opt.n_workers):
+                if not dones[worker]:
+                    episode_lengths[worker] += 1
+                else:
+                    self.writer.add_scalar('episode_length/' + str(worker), episode_lengths[worker], eps_num)
+                    print(worker, episode_lengths[worker])
+                    episode_lengths[worker] = 0
+
+            # Save network
+            if eps_num % self.opt.save_frequency == 0:
+                if not os.path.exists(self.opt.exp_name):
+                    os.mkdir(self.opt.exp_name)
+                torch.save(self.net.state_dict(), f'{self.opt.exp_name}/{str(i).zfill(7)}.pt')
+
+            # Write results to log
+            if eps_num % self.opt.log_frequency == 0:
+                self.writer.add_scalar('loss/total', loss, eps_num)
+                self.writer.add_scalar('loss/action', action_loss, eps_num)
+                self.writer.add_scalar('loss/value', value_loss, eps_num)
+                self.writer.add_scalar('loss/entropy', entropy_loss, eps_num)
+
+            # Move on to next state
+            states = next_states
+
+        """
+        -----------------------------------------
+
+        -----------------------------------------
+
+        -----------------------------------------
+
+        -----------------------------------------
+        From here: Old training
+        """
         batch = random.sample(self.memory, self.batch_size)
         batch = np.array(batch, dtype=object)
 
@@ -275,4 +353,81 @@ class PPOAgent:
             self.epsilon *= self.epsilon_decay
         else:
             self.epsilon = self.epsilon_min
+
+    # Not fitted for Doom [chage via try-error implementation (run, bugs, print, fix, repeat)]
+    def optimize_model(self):
+        """
+        Performs a single step of optimization.
+
+        Arguments:
+            next_state (tensor): next frame of the game
+            done (bool): True if next_state is a terminal state, else False
+
+        Returns:
+            loss (float)
+        """
+        # Process batch from memory
+        memory = Experience(*zip(*self.memory))
+
+        batch = {
+            'state': torch.stack(memory.state).detach(),
+            'action': torch.stack(memory.action).detach(),
+            'reward': torch.tensor(memory.reward).detach(),
+            'mask': torch.stack(memory.mask).detach(),
+            'action_log_prob': torch.stack(memory.action_log_prob).detach(),
+            'value': torch.stack(memory.value).detach()
+        }
+        # TODO: Check if these dimensions are still valid
+        state_shape = batch['state'].size()[2:]
+        action_shape = batch['action'].size()[-1]
+
+        # Compute returns
+        returns = torch.zeros(self.para['buffer'] + 1, 8, 1)
+        for i in reversed(range(self.para['buffer'])):
+            returns[i] = returns[i+1] * 0.99 * batch['mask'][i] + batch['reward'][i]
+        returns = returns[:-1]
+        returns = (returns - returns.mean()) / (returns.std() + 1e-5)
+
+        # Process batch
+        values, action_log_probs, dist_entropy = self.model.evaluate_actions(batch['state'].view(-1, *state_shape), batch['action'].view(-1, action_shape)) ### HERE
+        values = values.view(self.para['buffer'], 8, 1)
+        action_log_probs = action_log_probs.view(self.para['buffer'], 8, 1)
+
+        # Compute advantages
+        advantages = returns - values.detach()
+
+        # Action loss
+        ratio = torch.exp(action_log_probs - batch['action_log_prob'].detach())
+        surr1 = ratio * advantages 
+        surr2 = torch.clamp(ratio, 1-self.opt.grad_clip, 1+self.opt.grad_clip) * advantages
+        action_loss = -torch.min(surr1, surr2).mean()
+
+        # Value loss
+        value_loss = (returns - values).pow(2).mean()
+        value_loss = self.opt.value_loss_coeff * value_loss
+
+        # Total loss
+        loss = value_loss + action_loss - dist_entropy * self.opt.entropy_coeff
+
+        # Optimizer step
+        self.optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm(self.net.parameters(), self.opt.max_grad_norm)
+        self.optimizer.step()
+
+        return loss, value_loss * self.opt.value_loss_coeff, action_loss, - dist_entropy * self.opt.entropy_coeff
+    
+    #TODO: Unchanged starting here
+    def get_action(self, state):
+        if np.random.uniform() < self.epsilon:
+            return random.choice(range(self.action_size))
+        else:
+            state = np.expand_dims(state, axis=0)
+            state = torch.from_numpy(state).float().to(DEVICE)
+            action = torch.argmax(self.q_net(state)).item()
+            return action
+
+    def update_target_net(self):
+        self.target_net.load_state_dict(self.q_net.state_dict())
+
 
