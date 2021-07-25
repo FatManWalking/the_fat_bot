@@ -6,6 +6,8 @@ import vizdoom as vzd
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.distributions import Categorical
+
 import numpy as np
 import random
 import itertools as it
@@ -15,6 +17,7 @@ from vizdoom import Mode
 from time import sleep, time
 from collections import deque
 from tqdm import trange
+from collections import namedtuple
 
 from base import Agent, Model
 
@@ -58,14 +61,106 @@ def test(game, agent):
     print("Results: mean: %.1f +/- %.1f," % (
         test_scores.mean(), test_scores.std()), "min: %.1f" % test_scores.min(),
           "max: %.1f" % test_scores.max())
-    
+
+#TODO: check this.
+def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
+    """
+    Run num epochs of training episodes.
+    Skip frame_repeat number of frames after each action.
+    """
+
+    start_time = time()
+
+    for epoch in range(num_epochs):
+        game.new_episode()
+        train_scores = []
+        global_step = 0
+        print("\nEpoch #" + str(epoch + 1))
+
+        for _ in trange(steps_per_epoch, leave=False):
+            state = preprocess(game.get_state().screen_buffer)
+            action = agent.get_action(state)
+            reward = game.make_action(actions[action], frame_repeat)
+            done = game.is_episode_finished()
+
+            if not done:
+                next_state = preprocess(game.get_state().screen_buffer)
+            else:
+                next_state = np.zeros((1, 90, 135)).astype(np.float32) # 30x45 = 30x45
+
+            agent.append_memory(state, action, reward, next_state, done)
+
+            if global_step > agent.batch_size:
+                agent.train()
+
+            if done:
+                train_scores.append(game.get_total_reward())
+                game.new_episode()
+
+            global_step += 1
+
+        agent.update_target_net()
+        overall_train_score.append(train_scores)
+        with open(text_file,"w") as textfile:
+            textfile.write(str(overall_train_score))
+        train_scores = np.array(train_scores)
+        
+
+        print("Results: mean: %.1f +/- %.1f," % (train_scores.mean(), train_scores.std()),
+              "min: %.1f," % train_scores.min(), "max: %.1f," % train_scores.max())
+
+        test(game, agent)
+        if save_model:
+            print("Saving the network weights to:", model_savefile)
+            torch.save(agent.q_net, model_savefile)
+        print("Total elapsed time: %.2f minutes" % ((time() - start_time) / 60.0))
+
+    game.close()
+    return agent, game
+   
 class ActorCritc(Model):
     
-    def __init__(self, available_actions_count) -> None:
+    def __init__(self, available_actions_count, _type) -> None:
         super().__init__(available_actions_count)
+        
+        #critic
+        self.critic = nn.Sequential(
+            nn.Linear(self.feature_size(), 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
+
+        #actor
+        self.actor = nn.Sequential(
+            nn.Linear(self.feature_size(), 128),
+            nn.ReLU(),
+            nn.Linear(128, available_actions_count)
+        )
+        
+        self.type = _type
     
     def forward(self, x):
-        return super().forward(x)
+        """forward pass
+
+        Args:
+            x (tensor): the state input
+            type (string): "actor" or "critic"
+        """
+        # gets the convulted and flattend input back
+        x = super().forward(x)
+        
+        if self.type=='actor':
+            x = self.actor(x)
+            x = self.softmax(x)
+            dist = Categorical(x)
+            return dist
+            
+        elif self.type=='critic':
+            x = self.critic(x)
+            return x
+            
+        else:
+            raise(NotImplementedError, "You forgot to give the type 'actor' or 'critic' for the forward pass")
     
     def feature_size(self):
         return super().feature_size()
@@ -75,25 +170,78 @@ class PPOAgent(Agent):
     def __init__(self, options, action_size) -> None:
         super().__init__(options, action_size)
         
-        self.net = ActorCritc()
+        self.actor_model = ActorCritc(action_size, "actor")
+        self.critic_model = ActorCritc(action_size, "critic")
         
-        if self.opt.weights_dir != '':
-            print("Loading model from: ", self.opt.weights_dir)
-            self.net.load_state_dict(torch.load(self.opt.weights_dir))
-        
-        self.optimizer = optim.Adam(self.net.parameters(), lr=self.opt.learning_rate)
+        for model in [self.actor_model, self.critic_model]:
+            
+            if self.opt.weights_dir != '':
+                print("Loading model from: ", self.opt.weights_dir)
+                model.load_state_dict(torch.load(self.opt.weights_dir))
+            
+        self.critic_optimizer = optim.Adam(self.critic_model.parameters(), lr=self.opt.learning_rate)
+        self.actor_optimizer = optim.Adam(self.actor_model.parameters(), lr=self.opt.learning_rate)
         # self.optimizer = optim.SGD(self.net.parameters(), lr=self.opt.learning_rate)
         
-    def step(self, states, actions, action_log_probs, values, rewards, masks):
+    def step(self, states, actions, action_log_probs, values, rewards, masks, next_state):
         self.memory.append((states, actions, action_log_probs, values, rewards, masks))
+        
+        self.steps_taken = (self.steps_taken + 1) % self.opt.buffer_update_freq
+        
+        if self.steps_taken == 0:
+            self.optimize(next_state)
+            self.memory = []
     
     def act(self, state):
-        return super().act(state, self.net)
+        """Returns action, log_prob, value for given state as per current policy."""
+        
+        state = torch.from_numpy(state).unsqueeze(0).to(self.device)
+        action_probs = self.actor_model(state)
+        value = self.critic_model(state)
+
+        action = action_probs.sample()
+        log_prob = action_probs.log_prob(action)
+
+        return action.item(), log_prob, value
     
-    def optimize(self):
+    def optimize(self, next_state):
         """optimize the weights and biases in the network
         
-        old ppo line 386
         """
+        # next_state
+        next_state = torch.from_numpy(next_state).float().to(DEVICE)
+        next_value = self.critic_model(next_state)
         
+        # Process batch from memory
+        memory = Experience(*zip(*self.memory))
+        
+        batch = {
+            'state': torch.stack(memory.state).detach(),
+            'action': torch.stack(memory.action).detach(),
+            'reward': torch.tensor(memory.reward).detach(),
+            'mask': torch.stack(memory.mask).detach(),
+            'action_log_prob': torch.stack(memory.action_log_prob).detach(),
+            'value': torch.stack(memory.value).detach()
+        }
+    
+    def random_iterator(self, returns, advantage):
+        
+        # TODO: anders an state.size rankommen
+        memory_size = self.states.size(0)
+        for _ in range(memory_size // self.batch_size):
+            rand_ids = np.random.randint(0, memory_size, self.batch_size)
+            yield self.states[rand_ids, :], self.actions[rand_ids], self.log_probs[rand_ids], returns[rand_ids, :], advantage[rand_ids, :]
+        
+    def get_advantages(values, masks, rewards):
+        returns = []
+        gae = 0
+        gamma = self.opt.discount_factor
+        
+        for i in reversed(range(len(rewards))):
+            delta = rewards[i] + gamma * values[i + 1] * masks[i] - values[i]
+            gae = delta + gamma * 0.95 * masks[i] * gae
+            returns.insert(0, gae + values[i])
+
+        adv = np.array(returns) - values[:-1]
+        return returns, (adv - np.mean(adv)) / (np.std(adv) + 1e-10)
     
