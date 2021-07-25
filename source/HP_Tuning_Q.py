@@ -38,7 +38,7 @@ episodes_to_watch = 10
 
 model_savefile = "../models/DualQ_e=30_lr=schedCos_df=0.97.pth"
 text_file = "../rewards/DualQ_e=30_lr=schedCos_df=0.97.txt"
-save_model = True
+save_model = False
 load_model = True
 skip_learning = False
 
@@ -205,7 +205,6 @@ class DuelQNet(nn.Module):
         x = self.conv4(x)
         #print(x.shape)
         x = x.view(-1, 7888) # 30x45 = 192
-        #print(x.shape)
         x1 = x[:, :3944]  # input for the net to calculate the state value # 30x45 = 96
         x2 = x[:, 3944:]  # relative advantage of actions in the state
         state_value = self.state_fc(x1).reshape(-1, 1)
