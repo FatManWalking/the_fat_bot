@@ -156,7 +156,7 @@ class ActorCritic(nn.Module):
             nn.Linear(64, available_actions_count)
         )
 
-        self.softmax = n.Softmax()
+        self.softmax = nn.Softmax()
 
         self.logsoftmax = nn.LogSoftmax()
 
@@ -219,10 +219,38 @@ class ActorCritic(nn.Module):
 class PPOAgent:
 
     def __init__(self, options, action_size):
+        """Initalize an Agent for PPO
+
+        Args:
+            options (dict): Contains all terminal defined options full list below        
+            action_size (int): number of actions that can be taken each step
+            
+        Options (full list):
+            --scene:                the .cfg and .wad
+            --mode:                 "train" or "eval"
+            --model_name:           name of the model file to be saved
+            --weights_dir:          name of the model file to be loaded
+            --n_train_iterations:   number of epochs
+            --learning_rate:        learning rate (both actor and critic, same for simplicity)
+            --replay_memory_size:   batch size
+            --discount_factor:      discount / gamma factor
+            --n_workers:            number of actor critic workers
+            --buffer_update_freq    refresh buffer after every x actions
+            --entropy_coeff         entropy regularization weight
+            --value_loss_coeff      value loss regularization weight
+            --max_grad_norm         norm bound for clipping gradients
+            --grad_clip             magnitude bound for clipping gradients
+            --log_frequency         number of batches between each tensorboard log
+            --save_frequency        number of batches between each model save
+        
+        Missing:
+            --input_shape (resultion)
+            --tau value
+        """
         
         self.opt = options
         self.action_size = action_size
-        self.memory = deque(maxlen=opt.replay_memory_size)
+        self.memory = deque(maxlen=self.opt.replay_memory_size)
         self.criterion = nn.MSELoss()
 
         self.ppo = ActorCritic(action_size)
@@ -231,7 +259,7 @@ class PPOAgent:
             print("Loading model from: ", self.opt.weights_dir)
             self.ppo.load_state_dict(torch.load(self.opt.weights_dir))
             
-        self.opt = optim.Adam(self.ppo.parameters(), lr=self.opt.learning_rate)
+        self.optimizer = optim.Adam(self.ppo.parameters(), lr=self.opt.learning_rate)
 
         self.ppo.to(DEVICE)
     
@@ -344,10 +372,10 @@ class PPOAgent:
         states = torch.from_numpy(states).float().to(DEVICE)
         action_values = self.q_net(states)[idx].float().to(DEVICE)
 
-        self.opt.zero_grad()
+        self.optimizer.zero_grad()
         td_error = self.criterion(q_targets, action_values)
         td_error.backward()
-        self.opt.step()
+        self.optimizer.step()
 
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
