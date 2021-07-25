@@ -19,9 +19,9 @@ from collections import deque
 from tqdm import trange
 
 # Q-learning settings
-learning_rate = 0.0005
-discount_factor = 0.99
-train_epochs = 500
+learning_rate = 0.01
+discount_factor = 0.97
+train_epochs = 50
 learning_steps_per_epoch = 2000
 replay_memory_size = 10000
 
@@ -33,17 +33,17 @@ test_episodes_per_epoch = 10
 
 # Other parameters
 frame_repeat = 12
-resolution = (30, 45)
+resolution = (90, 135)
 episodes_to_watch = 10
 
-model_savefile = "./DualQ_e=130_lr=0.0005_df=0.99.pth"
-text_file = "./DualQ_e=130_lr=0.0005_df=0.99.txt"
+model_savefile = "../models/DualQ_e=30_lr=schedCos_df=0.97.pth"
+text_file = "../rewards/DualQ_e=30_lr=schedCos_df=0.97.txt"
 save_model = False
 load_model = True
-skip_learning = True
+skip_learning = False
 
 # Configuration file path
-config_file_path = "../../scenarios/BasicAugment.cfg"
+config_file_path = "../wads/BasicAugment.cfg"
 overall_train_score = []
 # config_file_path = "../../scenarios/rocket_basic.cfg"
 # config_file_path = "../../scenarios/basic.cfg"
@@ -121,7 +121,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
             if not done:
                 next_state = preprocess(game.get_state().screen_buffer)
             else:
-                next_state = np.zeros((1, 30, 45)).astype(np.float32)
+                next_state = np.zeros((1, 90, 135)).astype(np.float32) # 30x45 = 30x45
 
             agent.append_memory(state, action, reward, next_state, done)
 
@@ -187,13 +187,13 @@ class DuelQNet(nn.Module):
         )
 
         self.state_fc = nn.Sequential(
-            nn.Linear(96, 64),
+            nn.Linear(3944, 64), # 30 x 45 = 96, 64
             nn.ReLU(),
             nn.Linear(64, 1)
         )
 
         self.advantage_fc = nn.Sequential(
-            nn.Linear(96, 64),
+            nn.Linear(3944, 64), # 30 x 45 = 96, 64
             nn.ReLU(),
             nn.Linear(64, available_actions_count)
         )
@@ -203,9 +203,10 @@ class DuelQNet(nn.Module):
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
-        x = x.view(-1, 192)
-        x1 = x[:, :96]  # input for the net to calculate the state value
-        x2 = x[:, 96:]  # relative advantage of actions in the state
+        #print(x.shape)
+        x = x.view(-1, 7888) # 30x45 = 192
+        x1 = x[:, :3944]  # input for the net to calculate the state value # 30x45 = 96
+        x2 = x[:, 3944:]  # relative advantage of actions in the state
         state_value = self.state_fc(x1).reshape(-1, 1)
         advantage_values = self.advantage_fc(x2)
         x = state_value + (advantage_values - advantage_values.mean(dim=1).reshape(-1, 1))
@@ -214,7 +215,8 @@ class DuelQNet(nn.Module):
 
 class DQNAgent:
     def __init__(self, action_size, memory_size, batch_size, discount_factor, 
-                 lr, load_model, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1):
+                 lr, load_model, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1, scheduler=None):
+
         self.action_size = action_size
         self.epsilon = epsilon
         self.epsilon_decay = epsilon_decay
@@ -238,6 +240,12 @@ class DQNAgent:
 
         self.opt = optim.SGD(self.q_net.parameters(), lr=self.lr)
 
+        if scheduler:
+            # self.scheduler = CosineScheduler(30, warmup_steps=5, base_lr=self.lr, final_lr=self.lr*0.0001)
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.opt, 30, eta_min=0, last_epoch=-1, verbose=False)
+        else:
+            self.scheduler = None
+
     def get_action(self, state):
         if np.random.uniform() < self.epsilon:
             return random.choice(range(self.action_size))
@@ -254,6 +262,7 @@ class DQNAgent:
         self.memory.append((state, action, reward, next_state, done))
 
     def train(self):
+                    
         batch = random.sample(self.memory, self.batch_size)
         batch = np.array(batch, dtype=object)
 
@@ -286,14 +295,49 @@ class DQNAgent:
 
         self.opt.zero_grad()
         td_error = self.criterion(q_targets, action_values)
-        td_error.backward()
         self.opt.step()
+
+        if self.scheduler:
+            if self.scheduler.__module__ == optim.lr_scheduler.__name__:
+                # Using PyTorch In-Built scheduler
+                self.scheduler.step()
+            else:
+                # Using custom defined scheduler
+                for param_group in trainer.param_groups:
+                    param_group['lr'] = scheduler(epoch)
 
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
         else:
             self.epsilon = self.epsilon_min
 
+        
+
+# https://d2l.ai/chapter_optimization/lr-scheduler.html
+class CosineScheduler:
+    def __init__(self, max_update, base_lr=0.01, final_lr=0, warmup_steps=0,
+                 warmup_begin_lr=0):
+        self.base_lr_orig = base_lr
+        self.max_update = max_update
+        self.final_lr = final_lr
+        self.warmup_steps = warmup_steps
+        self.warmup_begin_lr = warmup_begin_lr
+        self.max_steps = self.max_update - self.warmup_steps
+
+    def get_warmup_lr(self, epoch):
+        increase = (self.base_lr_orig - self.warmup_begin_lr) \
+                       * float(epoch) / float(self.warmup_steps)
+        return self.warmup_begin_lr + increase
+
+    def __call__(self, epoch):
+        if epoch < self.warmup_steps:
+            return self.get_warmup_lr(epoch)
+        if epoch <= self.max_update:
+            self.base_lr = self.final_lr + (
+                self.base_lr_orig - self.final_lr) * (1 + math.cos(
+                    math.pi *
+                    (epoch - self.warmup_steps) / self.max_steps)) / 2
+        return self.base_lr
 
 if __name__ == '__main__':
     # Initialize game and actions
@@ -304,7 +348,7 @@ if __name__ == '__main__':
     # Initialize our agent with the set parameters
     agent = DQNAgent(len(actions), lr=learning_rate, batch_size=batch_size,
                      memory_size=replay_memory_size, discount_factor=discount_factor,
-                     load_model=load_model)
+                     load_model=load_model, scheduler=True)
 
     # Run the training for the set number of epochs
     if not skip_learning:
