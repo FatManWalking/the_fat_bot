@@ -30,10 +30,10 @@ parser.add_argument("--mode",
                     choices=["train", "eval"])
 
 # DIRECTORY options
-parser.add_argument("--exp_name",
+parser.add_argument("--model_name",
                     type=str,
                     help="name of experiment, to be used as save_dir",
-                    default="exp_model")
+                    default="model_name")
 parser.add_argument("--weights_dir",
                     type=str,
                     help="name of model to load",
