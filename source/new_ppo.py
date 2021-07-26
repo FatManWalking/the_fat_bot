@@ -138,7 +138,10 @@ class ActorCritc(Model):
         )
         
         self.type = _type
-    
+        
+    def initialize_weights(self, layer):
+        return super().initialize_weights(layer)
+        
     def forward(self, x):
         """forward pass
 
@@ -179,6 +182,11 @@ class PPOAgent(Agent):
                 print("Loading model from: ", self.opt.weights_dir)
                 model.load_state_dict(torch.load(self.opt.weights_dir))
             
+            else:
+                # Applies a inital weight to Conv and Linear Layers
+                # Currently Xavier Uniform. Orthogonal is also implemented
+                model.apply(model.initialize_weights)
+            
         self.critic_optimizer = optim.Adam(self.critic_model.parameters(), lr=self.opt.learning_rate)
         self.actor_optimizer = optim.Adam(self.actor_model.parameters(), lr=self.opt.learning_rate)
         # self.optimizer = optim.SGD(self.net.parameters(), lr=self.opt.learning_rate)
@@ -209,7 +217,7 @@ class PPOAgent(Agent):
         
         """
         # next_state
-        next_state = torch.from_numpy(next_state).float().to(DEVICE)
+        # next_state = torch.from_numpy(next_state).float().to(DEVICE) # Propably not needed
         next_value = self.critic_model(next_state)
         
         # Process batch from memory

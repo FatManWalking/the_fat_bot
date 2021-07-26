@@ -72,6 +72,7 @@ class Agent(ABC):
         Returns action, log_prob, value for given state as per current policy.
         """
         
+        """ 
         # Forward pass
         values, action_logits = actor.forward(state)
         probs = actor.softmax(action_logits)
@@ -84,7 +85,9 @@ class Agent(ABC):
         action_log_probs = log_probs.gather(1, actions)
         
         return values, actions, action_log_probs
-    
+        """
+        pass
+ 
     @abstractmethod
     def optimize(self):
         pass
@@ -122,24 +125,30 @@ class Model(ABC, nn.Module):
             nn.ReLU()     
         )
 
-        #critic
-        self.critic = nn.Sequential(
-            nn.Linear(self.feature_size(), 64),
-            nn.ReLU(),
-            nn.Linear(64, 1)
-        )
-
-        #actor
-        self.actor = nn.Sequential(
-            nn.Linear(self.feature_size(), 64),
-            nn.ReLU(),
-            nn.Linear(64, available_actions_count)
-        )
-
         self.softmax = nn.Softmax()
 
         self.logsoftmax = nn.LogSoftmax()
     
+    @abstractmethod 
+    def initialize_weights(self, layer):
+        # gain = nn.init.calculate_gain(self.cfg.nonlinearity)
+        init_weight = 'xavier_uniform'
+        gain = 1
+
+        if init_weight == 'orthogonal':
+            if type(layer) == nn.Conv2d or type(layer) == nn.Linear:
+                nn.init.orthogonal_(layer.weight.data, gain=gain)
+                layer.bias.data.fill_(0)
+            else:
+                pass
+            
+        elif init_weight == 'xavier_uniform':
+            if type(layer) == nn.Conv2d or type(layer) == nn.Linear:
+                nn.init.xavier_uniform_(layer.weight.data, gain=gain)
+                layer.bias.data.fill_(0)
+            else:
+                pass
+            
     @abstractmethod
     def forward(self, x):
         """
@@ -149,21 +158,24 @@ class Model(ABC, nn.Module):
             x (tensor): batch of input states to be processed
 
         return:
-            state_value = forward of critic
-            action_logits = forward of actor
+            x (tensor): tensor after convultion and flatten
         """
         x = self.convultion(x)
+        
         size = x.size(1)*x.size(2)*x.size(3)
         x = x.view(-1, size)
         
+        return x
+        """
         #TODO: Check if correct
         x1 = x[:, :int(size//2)]  # input for the net to calculate the state value
         x2 = x[:, int(size//2):]  # relative advantage of actions in the state
         state_value = self.critic(x1).reshape(-1, 1)
         action_logits = self.actor(x2)
-        
+
         return state_value, action_logits
-    
+        """
+        
     @abstractmethod
     def feature_size(self):
         return self.convultion(autograd.Variable(torch.zeros(1, *self.input_shape))).view(1, -1).size(1)
