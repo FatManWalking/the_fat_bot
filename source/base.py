@@ -30,13 +30,11 @@ class Agent(ABC):
         """Initalize an Agent for Reinforcement Learning
 
         Args:
-            options (dict): Contains all terminal defined options full list below        
+            options (dict): Contains all terminal defined options list below or in main.py for full list      
             action_size (int): number of actions that can be taken each step
             
         Options (full list):
-            --scene:                the .cfg and .wad
-            --mode:                 "train" or "eval"
-            --model_name:           name of the model file to be saved
+
             --weights_dir:          name of the model file to be loaded
             --n_train_iterations:   number of epochs
             --learning_rate:        learning rate (both actor and critic, same for simplicity)
@@ -48,7 +46,6 @@ class Agent(ABC):
             --value_loss_coeff      value loss regularization weight
             --max_grad_norm         norm bound for clipping gradients
             --grad_clip             magnitude bound for clipping gradients
-            --log_frequency         number of batches between each tensorboard log
             --save_frequency        number of batches between each model save
         """
         super().__init__()
@@ -77,8 +74,19 @@ class Agent(ABC):
     
     @abstractmethod
     def get_scheduler(self, scheduler):
+        """gradually schedule the learning rate
+
+        tried different schedulers, saw no significant change between those with otherwise same parameters
+        
+        Args:
+            scheduler (bool): True or False, if u want to use a scheduler or not
+
+        Returns:
+            torch lr_scheduler or None: scheduler if true, None if False
+        """
         # return CosineScheduler(30, warmup_steps=5, base_lr=self.lr, final_lr=self.lr*0.0001)
         if scheduler:
+            #from SGDR: Stochastic Gradient Descent with Warm Restarts by Ilya Loshchilov and Frank Hutter but without restarts
             return torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, 30, eta_min=0, last_epoch=-1, verbose=False)
     
     @abstractmethod
@@ -96,7 +104,15 @@ class Agent(ABC):
     
     @abstractmethod
     def train(self):
+        """trains the agent and optimizes the network
+
+        takes a batch out of the stored states and values (memory)
+        base class returns the batch output after some processing
+        for methode specific training
         
+        Returns:
+            states, actions, rewards, next_states, dones, not_dones, row_idx
+        """
         batch = random.sample(self.memory, self.opt.batch_size)
         batch = np.array(batch, dtype=object)
 
@@ -115,6 +131,11 @@ class Model(ABC, nn.Module):
     
     @abstractmethod
     def __init__(self, available_actions_count) -> None:
+        """defining the CNN architecture for the Agent to decide with
+
+        Args:
+            available_actions_count (int): numbers of actions the agent can take in a single step
+        """
         super().__init__()
         
         
@@ -148,6 +169,14 @@ class Model(ABC, nn.Module):
     
     @abstractmethod 
     def initialize_weights(self, layer):
+        """initalizes the weights and biases
+
+        initalizes the weights and biases in case there was no state_dict provided to load them from
+        model_apply() iterativly goes through every layer and calls this methode
+        
+        Args:
+            layer (nn.Layer): the layer to be initalized
+        """
         # gain = nn.init.calculate_gain(self.cfg.nonlinearity)
         init_weight = 'xavier_uniform'
         gain = 1
@@ -183,18 +212,18 @@ class Model(ABC, nn.Module):
         x = x.view(-1, size)
         
         return x, size
-        """
-        #TODO: Check if correct
-        x1 = x[:, :int(size//2)]  # input for the net to calculate the state value
-        x2 = x[:, int(size//2):]  # relative advantage of actions in the state
-        state_value = self.critic(x1).reshape(-1, 1)
-        action_logits = self.actor(x2)
-
-        return state_value, action_logits
-        """
         
     @abstractmethod
     def feature_size(self):
+        """dynamically sets the dimension of the first linear Layer
+        
+        by calling this a forward pass through the layers definied in features is performed
+        and the resulting output_size can be used in the first linear Layer. Effectivly making
+        the net independend of the chosen resultion
+
+        Returns:
+            [type]: [description]
+        """
         return self.features(autograd.Variable(torch.zeros(1, *self.input_shape))).view(1, -1).size(1)
     
     
