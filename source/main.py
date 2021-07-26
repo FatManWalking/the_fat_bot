@@ -12,7 +12,7 @@ And the Github https://github.com/amanda-lambda/drl-experiments/blob/master/ppo.
 """
 
 from new_ppo import PPOAgent
-from HP_Tuning_Q import DQNAgent
+from DQN import DQNAgent
 import torch
 
 from vizdoom import Mode
