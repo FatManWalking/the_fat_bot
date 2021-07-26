@@ -260,7 +260,7 @@ def run(game, agent, actions, options):
         test(game, agent, options)
         if options.model_name and not (epoch%options.save_freq):
             print("Saving the network weights to:", options.model_name)
-            torch.save(agent.q_net, options.model_name)
+            torch.save(agent.q_net.state_dict(), options.model_name)
         print("Total elapsed time: %.2f minutes" % ((time() - start_time) / 60.0))
 
     game.close()

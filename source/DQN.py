@@ -86,7 +86,7 @@ class DQNAgent(Agent):
         
         for model in [self.q_net, self.target_net]:
             
-            if self.opt.weights_dir != '':
+            if self.opt.weights_dir != '' and self.opt.load_model:
                 print("Loading model from: ", self.opt.weights_dir)
                 model.load_state_dict(torch.load(self.opt.weights_dir))
                 self.epsilon = self.epsilon_min
@@ -98,9 +98,8 @@ class DQNAgent(Agent):
             
             model.to(DEVICE)
             
-        self.q_optimizer = optim.Adam(self.q_net.parameters(), lr=self.opt.learning_rate)
-        self.target_optimizer = optim.Adam(self.target_net.parameters(), lr=self.opt.learning_rate)
-        # self.optimizer = optim.SGD(self.target_net.parameters(), lr=self.opt.learning_rate)
+        self.optimizer = optim.Adam(self.q_net.parameters(), lr=self.opt.learning_rate)
+        # self.optimizer = optim.SGD(self.q_net.parameters(), lr=self.opt.learning_rate)
 
         self.scheduler = self.get_scheduler(scheduler)
 
@@ -145,10 +144,10 @@ class DQNAgent(Agent):
         states = torch.from_numpy(states).float().to(DEVICE)
         action_values = self.q_net(states)[idx].float().to(DEVICE)
 
-        self.optim.zero_grad()
+        self.optimizer.zero_grad()
         td_error = self.criterion(q_targets, action_values)
         td_error.backward()
-        self.optim.step()
+        self.optimizer.step()
 
         if self.scheduler:
             if self.scheduler.__module__ == optim.lr_scheduler.__name__:

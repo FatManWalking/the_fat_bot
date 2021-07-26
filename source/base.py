@@ -59,7 +59,7 @@ class Agent(ABC):
         
         # The agent has a memory where he stores states, the action he took when being in that state and things like he got for that
         # This determines how many samples there are in the memory to randomly batch from
-        self.memory = deque(maxlen=self.opt.replay_memory_size)
+        self.memory = deque(maxlen=self.opt.memory_size)
         
         # Mean Squared Error Loss Function
         self.criterion = nn.MSELoss()
@@ -153,16 +153,22 @@ class Model(ABC, nn.Module):
         gain = 1
 
         if init_weight == 'orthogonal':
-            if type(layer) == nn.Conv2d or type(layer) == nn.Linear:
+            if type(layer) == nn.Conv2d:
+                nn.init.orthogonal_(layer.weight.data, gain=gain)
+            elif type(layer) == nn.Linear:
                 nn.init.orthogonal_(layer.weight.data, gain=gain)
                 layer.bias.data.fill_(0)
             else:
                 pass
             
         elif init_weight == 'xavier_uniform':
-            if type(layer) == nn.Conv2d or type(layer) == nn.Linear:
+            if type(layer) == nn.Conv2d:
+                nn.init.xavier_uniform_(layer.weight.data, gain=gain)
+
+            elif type(layer) == nn.Linear:
                 nn.init.xavier_uniform_(layer.weight.data, gain=gain)
                 layer.bias.data.fill_(0)
+
             else:
                 pass
             
