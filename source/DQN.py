@@ -10,6 +10,7 @@ from torch.distributions import Categorical
 
 import numpy as np
 import random
+import math
 
 from vizdoom import Mode
 from time import sleep
@@ -103,7 +104,7 @@ class DQNAgent:
 
     def train(self):
                     
-        batch = random.sample(self.memory, self.batch_size)
+        batch = random.sample(self.memory, self.opt.batch_size)
         batch = np.array(batch, dtype=object)
 
         states = np.stack(batch[:, 0]).astype(float)
@@ -113,7 +114,7 @@ class DQNAgent:
         dones = batch[:, 4].astype(bool)
         not_dones = ~dones
 
-        row_idx = np.arange(self.batch_size)  # used for indexing the batch
+        row_idx = np.arange(self.opt.batch_size)  # used for indexing the batch
 
         # value of the next states with double q learning
         # see https://arxiv.org/abs/1509.06461 for more information on double q learning
@@ -125,7 +126,7 @@ class DQNAgent:
 
         # this defines y = r + discount * max_a q(s', a)
         q_targets = rewards.copy()
-        q_targets[not_dones] += self.discount * next_state_values
+        q_targets[not_dones] += self.opt.discount_factor * next_state_values
         q_targets = torch.from_numpy(q_targets).float().to(DEVICE)
 
         # this selects only the q values of the actions taken

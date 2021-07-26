@@ -72,6 +72,10 @@ parser.add_argument("--steps",
                     type=int,
                     help="number of steps per episode",
                     default=1000)
+parser.add_argument("--batch_size",
+                    type=int,
+                    help="number of states per batch",
+                    default=64)
 parser.add_argument("--learning_rate",
                     type=float,
                     help="learning rate",
