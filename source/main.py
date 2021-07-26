@@ -12,9 +12,7 @@ And the Github https://github.com/amanda-lambda/drl-experiments/blob/master/ppo.
 """
 
 from new_ppo import PPOAgent
-from new_ppo import run as ppo_run
 from HP_Tuning_Q import DQNAgent
-from HP_Tuning_Q import run as dqn_run
 import torch
 
 from vizdoom import Mode
@@ -38,7 +36,7 @@ parser = argparse.ArgumentParser(description="options")
 parser.add_argument("--scene",
                     type=str,
                     help="run a specific .cfg and .wad",
-                    default="../scenarios/simpler_basic.cfg")
+                    default="../wads/BasicAugment.cfg")
 parser.add_argument("--mode",
                     type=str,
                     help="run the network in train or evaluation mode",
@@ -62,7 +60,7 @@ parser.add_argument("--weights_dir",
 parser.add_argument("--model",
                     type=str,
                     help="the model architecture",
-                    default='DQN',
+                    default='PPO',
                     choices=["DQN", "PPO"])
 parser.add_argument("--epochs",
                     type=int,
@@ -174,19 +172,6 @@ def preprocess(img):
     img = np.expand_dims(img, axis=0)
     return img
 
-def create_simple_game():
-    print("Initializing doom...")
-    game = vzd.DoomGame()
-    game.load_config(config_file_path)
-    game.set_window_visible(False)
-    game.set_mode(Mode.PLAYER)
-    game.set_screen_format(vzd.ScreenFormat.GRAY8)
-    game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-    game.init()
-    print("Doom initialized.")
-
-    return game
-
 def test(game, agent, options):
     """Runs a test_episodes_per_epoch episodes and prints the result"""
     print("\nTesting...")
@@ -272,26 +257,25 @@ if __name__ == '__main__':
     # Initialize a game for each worker and actions
     if options.model == 'PPO':
         games = [create_simple_game(options.scene) for i in range(options.n_workers)]
+        n = games[0].get_available_buttons_size()
     
     elif options.model == 'DQN':
         games = create_simple_game(options.scene)
+        n = games.get_available_buttons_size()
     else:
         raise(NotImplementedError, "The only model options available are DQN and PPO.")
     
-    n = games.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
-    print(actions)
+    # print(actions)
 
     #TODO: Check where the gameinstances are needed
     # Initialize our agent with the set parameters
     
     if options.model == 'PPO':
         agent = PPOAgent(options, len(actions))
-        run = ppo_run
         
     elif options.model == 'DQN':
         agent = DQNAgent(options, len(actions))
-        run = dqn_run
 
     # Run the training for the set number of epochs
     if options.mode == 'train':

@@ -40,7 +40,7 @@ model_savefile = "../models/DualQ_e=30_lr=schedCos_df=0.97.pth"
 text_file = "../rewards/DualQ_e=30_lr=schedCos_df=0.97.txt"
 save_model = False
 load_model = True
-skip_learning = False
+skip_learning = True
 
 # Configuration file path
 config_file_path = "../wads/BasicAugment.cfg"
