@@ -26,14 +26,16 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device('cpu')
 
+
 class DuelQNet(Model):
     """
     This is Duel DQN architecture.
     see https://arxiv.org/abs/1511.06581 for more information.
     """
     def __init__(self, available_actions_count) -> None:
+        #self.convultions, self.softmax, self.logsoftmax = 
         super().__init__(available_actions_count)
-
+        
         self.state_fc = nn.Sequential(
             nn.Linear(3944, 64), # 30 x 45 = 96, 64
             nn.ReLU(),
@@ -48,10 +50,15 @@ class DuelQNet(Model):
     
     def initialize_weights(self, layer):
         return super().initialize_weights(layer)
+    
+    def feature_size(self):
+        return super().feature_size()
 
     def forward(self, x):
+
         x, size = super().forward(x)
         size = int(size//2)
+
         x1 = x[:, :size]  # input for the net to calculate the state value # 30x45 = 96
         x2 = x[:, size:]  # relative advantage of actions in the state
         state_value = self.state_fc(x1).reshape(-1, 1)
@@ -61,18 +68,25 @@ class DuelQNet(Model):
         return x
 
 class DQNAgent:
-    def __init__(self, action_size, options, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1, scheduler=None):
-
+    def __init__(self, options, action_size, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1, scheduler=None):
+        
+        print(options)
         self.action_size = action_size
         self.opt = options
         self.memory = deque(maxlen=options.memory_size)
         self.criterion = nn.MSELoss()
+        self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
+        self.epsilon_min = epsilon_min
 
         if options.load_model:
-            print("Loading model from: ", options.weights_dir)
+            print("Try loading model from: ", options.weights_dir)
+            #try: 
             self.q_net = torch.load(options.weights_dir)
             self.target_net = torch.load(options.weights_dir)
             self.epsilon = self.epsilon_min
+            #except:
+            #    raise FileNotFoundError(f"There was no file with name {options.weights_dir}")
 
         else:
             print("Initializing new model")
@@ -180,6 +194,7 @@ class CosineScheduler:
                     (epoch - self.warmup_steps) / self.max_steps)) / 2
         return self.base_lr
 
+"""
 if __name__ == '__main__':
     # Initialize game and actions
     game = create_simple_game()
@@ -220,3 +235,4 @@ if __name__ == '__main__':
         sleep(1.0)
         score = game.get_total_reward()
         print("Total score: ", score)
+"""

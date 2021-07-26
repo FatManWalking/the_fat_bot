@@ -103,7 +103,7 @@ class Model(ABC, nn.Module):
         super().__init__()
         
         
-        self.convultion = nn.Sequential(
+        self.convultions = nn.Sequential(
             # Conv Layer 1
             nn.Conv2d(1, 8, kernel_size=3, stride=2, bias=False),
             nn.BatchNorm2d(8),
@@ -128,6 +128,8 @@ class Model(ABC, nn.Module):
         self.softmax = nn.Softmax()
 
         self.logsoftmax = nn.LogSoftmax()
+
+        # return convultions, softmax, logsoftmax
     
     @abstractmethod 
     def initialize_weights(self, layer):
@@ -160,12 +162,12 @@ class Model(ABC, nn.Module):
         return:
             x (tensor): tensor after convultion and flatten
         """
-        x = self.convultion(x)
+        x = self.convultions(x)
         
         size = x.size(1)*x.size(2)*x.size(3)
         x = x.view(-1, size)
         
-        return x
+        return x, size
         """
         #TODO: Check if correct
         x1 = x[:, :int(size//2)]  # input for the net to calculate the state value
@@ -178,7 +180,7 @@ class Model(ABC, nn.Module):
         
     @abstractmethod
     def feature_size(self):
-        return self.convultion(autograd.Variable(torch.zeros(1, *self.input_shape))).view(1, -1).size(1)
+        return self.features(autograd.Variable(torch.zeros(1, *self.input_shape))).view(1, -1).size(1)
     
     
     

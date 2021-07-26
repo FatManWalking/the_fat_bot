@@ -11,8 +11,8 @@ And the Github https://github.com/amanda-lambda/drl-experiments/blob/master/ppo.
 --> A PPO implementation for Flappy Bird
 """
 
-from new_ppo import PPOAgent
-from DQN import DQNAgent
+from new_ppo import *
+from DQN import *
 import torch
 
 from vizdoom import Mode
@@ -30,6 +30,8 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device('cpu')
 
+overall_train_score = []
+
 parser = argparse.ArgumentParser(description="options")
 
 # Genric Options
@@ -46,15 +48,20 @@ parser.add_argument("--frame_repeat",
                     type=int,
                     help="repeat frame n times",
                     default=12)
+
 # DIRECTORY options
 parser.add_argument("--model_name",
                     type=str,
                     help="name of experiment, to be used as save_dir",
-                    default="model_name")
+                    default="../models/DuelQ_from_basic.pth")
 parser.add_argument("--weights_dir",
                     type=str,
                     help="name of model to load",
-                    default="")
+                    default='../models/DualQ_e=30_lr=schedCos_df=0.97.pth')
+parser.add_argument("--text_file",
+                    type=str,
+                    help="name of model to load",
+                    default='../rewards/DuelQ_from_basic.txt')
 
 # TRAIN options
 parser.add_argument("--model",
@@ -78,7 +85,7 @@ parser.add_argument("--learning_rate",
                     type=float,
                     help="learning rate",
                     default=1e-5) # PPO 1e-5
-parser.add_argument("--replay_memory_size",
+parser.add_argument("--memory_size",
                     type=int,
                     help="number of states to keep in memory for batching",
                     default=1_000)
@@ -135,7 +142,7 @@ parser.add_argument("--save_model",
 parser.add_argument("--load_model",
                     type=bool,
                     help="load model before training",
-                    default=True)
+                    default=False)
 parser.add_argument("--skip_training",
                     type=bool,
                     help="skip training",
@@ -169,9 +176,9 @@ def create_simple_game(config_file_path):
 
     return game
 
-def preprocess(img):
+def preprocess(img, resultion):
     """Down samples image to resolution"""
-    img = skimage.transform.resize(img, resolution)
+    img = skimage.transform.resize(img, resultion)
     img = img.astype(np.float32)
     img = np.expand_dims(img, axis=0)
     return img
@@ -183,10 +190,10 @@ def test(game, agent, options):
     for test_episode in trange(options.test_episodes, leave=False):
         game.new_episode()
         while not game.is_episode_finished():
-            state = preprocess(game.get_state().screen_buffer)
+            state = preprocess(game.get_state().screen_buffer, options.resultion)
             best_action_index = agent.get_action(state)
 
-            game.make_action(actions[best_action_index], frame_repeat)
+            game.make_action(actions[best_action_index], options.frame_repeat)
         r = game.get_total_reward()
         test_scores.append(r)
 
@@ -196,7 +203,7 @@ def test(game, agent, options):
           "max: %.1f" % test_scores.max())
 
 # TODO: implement having more than one worker
-def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
+def run(game, agent, actions, options, steps_per_epoch=2000):
     """
     Run num epochs of training episodes.
     Skip frame_repeat number of frames after each action.
@@ -204,26 +211,26 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
     start_time = time()
 
-    for epoch in range(num_epochs):
+    for epoch in range(options.epochs):
         game.new_episode()
         train_scores = []
         global_step = 0
         print("\nEpoch #" + str(epoch + 1))
 
         for _ in trange(steps_per_epoch, leave=False):
-            state = preprocess(game.get_state().screen_buffer)
+            state = preprocess(game.get_state().screen_buffer, options.resultion)
             action = agent.get_action(state)
-            reward = game.make_action(actions[action], frame_repeat)
+            reward = game.make_action(actions[action], options.frame_repeat)
             done = game.is_episode_finished()
 
             if not done:
-                next_state = preprocess(game.get_state().screen_buffer)
+                next_state = preprocess(game.get_state().screen_buffer, options.resultion)
             else:
                 next_state = np.zeros((1, 90, 135)).astype(np.float32) # 30x45 = 30x45
 
             agent.append_memory(state, action, reward, next_state, done)
 
-            if global_step > agent.batch_size:
+            if global_step > options.batch_size:
                 agent.train()
 
             if done:
@@ -234,7 +241,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
         agent.update_target_net()
         overall_train_score.append(train_scores)
-        with open(text_file,"w") as textfile:
+        with open(options.text_file,"w") as textfile:
             textfile.write(str(overall_train_score))
         train_scores = np.array(train_scores)
         
@@ -242,10 +249,10 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
         print("Results: mean: %.1f +/- %.1f," % (train_scores.mean(), train_scores.std()),
               "min: %.1f," % train_scores.min(), "max: %.1f," % train_scores.max())
 
-        test(game, agent)
-        if save_model:
-            print("Saving the network weights to:", model_savefile)
-            torch.save(agent.q_net, model_savefile)
+        test(game, agent, options)
+        if options.model_name:
+            print("Saving the network weights to:", options.model_name)
+            torch.save(agent.q_net, options.model_name)
         print("Total elapsed time: %.2f minutes" % ((time() - start_time) / 60.0))
 
     game.close()
@@ -284,8 +291,7 @@ if __name__ == '__main__':
     # Run the training for the set number of epochs
     if options.mode == 'train':
         
-        agent, game = run(games, agent, actions, num_epochs=options.epochs, frame_repeat=options.frame_repeat,
-                          steps_per_epoch=options.steps)
+        agent, game = run(games, agent, actions, options)
 
         print("======================================")
         print("Training finished. It's time to watch!")
