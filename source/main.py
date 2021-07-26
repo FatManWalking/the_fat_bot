@@ -60,7 +60,7 @@ parser.add_argument("--weights_dir",
 parser.add_argument("--model",
                     type=str,
                     help="the model architecture",
-                    default='PPO',
+                    default='DQN',
                     choices=["DQN", "PPO"])
 parser.add_argument("--epochs",
                     type=int,
