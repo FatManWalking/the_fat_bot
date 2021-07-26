@@ -14,11 +14,20 @@ import torch.optim as optim
 import torch.autograd as autograd
 import numpy as np
 
+"""
+The Goal of this file is a baseline overview over Reinforcement-Learning algorithms
+
+Agent and Model class are both written in a way that DQN as well as PPO can inherit from them by only calling super().
+Our Goal was to only have the method specific things in the according files to mark out their differences. This helps to
+keep the code clean and easy to debug, as well as giving as a basic understanding what seperates them in practise 
+oppose to only reading theorically about them.
+"""
+
 class Agent(ABC):
     
     @abstractmethod
     def __init__(self, options, action_size) -> None:
-        """Initalize an Agent for PPO
+        """Initalize an Agent for Reinforcement Learning
 
         Args:
             options (dict): Contains all terminal defined options full list below        
@@ -43,10 +52,16 @@ class Agent(ABC):
             --save_frequency        number of batches between each model save
         """
         super().__init__()
+        
+        # Set the configured options and the given action_size
         self.opt = options
         self.action_size = action_size
+        
+        # The agent has a memory where he stores states, the action he took when being in that state and things like he got for that
+        # This determines how many samples there are in the memory to randomly batch from
         self.memory = deque(maxlen=self.opt.replay_memory_size)
         
+        # Mean Squared Error Loss Function
         self.criterion = nn.MSELoss()
         
         """ Generic steps that need the actual Model class object
@@ -59,9 +74,15 @@ class Agent(ABC):
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.opt.learning_rate)
         self.optimizer = optim.SGD(self.net.parameters(), lr=self.opt.learning_rate)
         """
-              
+    
     @abstractmethod
-    def step(self):
+    def get_scheduler(self, scheduler):
+        # return CosineScheduler(30, warmup_steps=5, base_lr=self.lr, final_lr=self.lr*0.0001)
+        if scheduler:
+            return torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, 30, eta_min=0, last_epoch=-1, verbose=False)
+    
+    @abstractmethod
+    def append_memory(self):
         """appends everything related to one step to the memory
         """
         pass
@@ -69,32 +90,26 @@ class Agent(ABC):
     @abstractmethod
     def act(self, state, actor):
         """
-        Returns action, log_prob, value for given state as per current policy.
+        Returns the action to be taken by the agent.
         """
-        
-        """ 
-        # Forward pass
-        values, action_logits = actor.forward(state)
-        probs = actor.softmax(action_logits)
-        log_probs = actor.logsoftmax(action_logits)
-
-        # Choose action stochastically
-        actions = probs.multinomial(1)
-        
-        # Evaluate action
-        action_log_probs = log_probs.gather(1, actions)
-        
-        return values, actions, action_log_probs
-        """
-        pass
- 
-    @abstractmethod
-    def optimize(self):
         pass
     
     @abstractmethod
     def train(self):
-        pass
+        
+        batch = random.sample(self.memory, self.opt.batch_size)
+        batch = np.array(batch, dtype=object)
+
+        states = np.stack(batch[:, 0]).astype(float)
+        actions = batch[:, 1].astype(int)
+        rewards = batch[:, 2].astype(float)
+        next_states = np.stack(batch[:, 3]).astype(float)
+        dones = batch[:, 4].astype(bool)
+        not_dones = ~dones
+        
+        row_idx = np.arange(self.opt.batch_size)  # used for indexing the batch
+        
+        return states, actions, rewards, next_states, dones, not_dones, row_idx
 
 class Model(ABC, nn.Module):
     

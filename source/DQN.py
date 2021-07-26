@@ -37,13 +37,17 @@ class DuelQNet(Model):
         super().__init__(available_actions_count)
         
         self.state_fc = nn.Sequential(
-            nn.Linear(3944, 64), # 30 x 45 = 96, 64
+            nn.Linear(3944, 256), # 30 x 45 = 96, 64
+            nn.ReLU(),
+            nn.Linear(256, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         )
 
         self.advantage_fc = nn.Sequential(
-            nn.Linear(3944, 64), # 30 x 45 = 96, 64
+            nn.Linear(3944, 256), # 30 x 45 = 96, 64
+            nn.ReLU(),
+            nn.Linear(256, 64),
             nn.ReLU(),
             nn.Linear(64, available_actions_count)
         )
@@ -67,48 +71,51 @@ class DuelQNet(Model):
 
         return x
 
-class DQNAgent:
-    def __init__(self, options, action_size, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1, scheduler=None):
+class DQNAgent(Agent):
+
+    def __init__(self, options, action_size, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1, scheduler=None) -> None:
         
-        print(options)
-        self.action_size = action_size
-        self.opt = options
-        self.memory = deque(maxlen=options.memory_size)
-        self.criterion = nn.MSELoss()
+        super().__init__(options, action_size)
+        
         self.epsilon = epsilon
         self.epsilon_decay = epsilon_decay
         self.epsilon_min = epsilon_min
+        
+        self.q_net = DuelQNet(action_size)
+        self.target_net = DuelQNet(action_size)
+        
+        for model in [self.q_net, self.target_net]:
+            
+            if self.opt.weights_dir != '':
+                print("Loading model from: ", self.opt.weights_dir)
+                model.load_state_dict(torch.load(self.opt.weights_dir))
+                self.epsilon = self.epsilon_min
+                
+            else:
+                # Applies a inital weight to Conv and Linear Layers
+                # Currently Xavier Uniform. Orthogonal is also implemented
+                model.apply(model.initialize_weights)
+            
+            model.to(DEVICE)
+            
+        self.q_optimizer = optim.Adam(self.q_net.parameters(), lr=self.opt.learning_rate)
+        self.target_optimizer = optim.Adam(self.target_net.parameters(), lr=self.opt.learning_rate)
+        # self.optimizer = optim.SGD(self.target_net.parameters(), lr=self.opt.learning_rate)
 
-        if options.load_model:
-            print("Try loading model from: ", options.weights_dir)
-            #try: 
-            self.q_net = torch.load(options.weights_dir)
-            self.target_net = torch.load(options.weights_dir)
-            self.epsilon = self.epsilon_min
-            #except:
-            #    raise FileNotFoundError(f"There was no file with name {options.weights_dir}")
+        self.scheduler = self.get_scheduler(scheduler)
 
-        else:
-            print("Initializing new model")
-            self.q_net = DuelQNet(action_size).to(DEVICE)
-            self.target_net = DuelQNet(action_size).to(DEVICE)
-
-        self.optim = optim.SGD(self.q_net.parameters(), lr=options.learning_rate)
-
-        if scheduler:
-            # self.scheduler = CosineScheduler(30, warmup_steps=5, base_lr=self.lr, final_lr=self.lr*0.0001)
-            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optim, 30, eta_min=0, last_epoch=-1, verbose=False)
-        else:
-            self.scheduler = None
-
-    def get_action(self, state):
+    def get_scheduler(self, scheduler):
+        return super().get_scheduler(scheduler)
+    
+    def act(self, state):
+        
         if np.random.uniform() < self.epsilon:
-            return random.choice(range(self.action_size))
+            return random.choice(range(self.action_size)), None, None
         else:
             state = np.expand_dims(state, axis=0)
             state = torch.from_numpy(state).float().to(DEVICE)
             action = torch.argmax(self.q_net(state)).item()
-            return action
+            return action, None, None
 
     def update_target_net(self):
         self.target_net.load_state_dict(self.q_net.state_dict())
@@ -117,18 +124,8 @@ class DQNAgent:
         self.memory.append((state, action, reward, next_state, done))
 
     def train(self):
-                    
-        batch = random.sample(self.memory, self.opt.batch_size)
-        batch = np.array(batch, dtype=object)
-
-        states = np.stack(batch[:, 0]).astype(float)
-        actions = batch[:, 1].astype(int)
-        rewards = batch[:, 2].astype(float)
-        next_states = np.stack(batch[:, 3]).astype(float)
-        dones = batch[:, 4].astype(bool)
-        not_dones = ~dones
-
-        row_idx = np.arange(self.opt.batch_size)  # used for indexing the batch
+        
+        states, actions, rewards, next_states, dones, not_dones, row_idx = super().train()
 
         # value of the next states with double q learning
         # see https://arxiv.org/abs/1509.06461 for more information on double q learning
@@ -150,25 +147,22 @@ class DQNAgent:
 
         self.optim.zero_grad()
         td_error = self.criterion(q_targets, action_values)
+        td_error.backward()
         self.optim.step()
 
         if self.scheduler:
             if self.scheduler.__module__ == optim.lr_scheduler.__name__:
                 # Using PyTorch In-Built scheduler
                 self.scheduler.step()
-            else:
-                # Using custom defined scheduler
-                for param_group in trainer.param_groups:
-                    param_group['lr'] = scheduler(epoch)
 
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
         else:
             self.epsilon = self.epsilon_min
-
-        
+      
 
 # https://d2l.ai/chapter_optimization/lr-scheduler.html
+# A Cosinus Scheduler to gradually decrease the learning rate
 class CosineScheduler:
     def __init__(self, max_update, base_lr=0.01, final_lr=0, warmup_steps=0,
                  warmup_begin_lr=0):
@@ -193,46 +187,3 @@ class CosineScheduler:
                     math.pi *
                     (epoch - self.warmup_steps) / self.max_steps)) / 2
         return self.base_lr
-
-"""
-if __name__ == '__main__':
-    # Initialize game and actions
-    game = create_simple_game()
-    n = game.get_available_buttons_size()
-    actions = [list(a) for a in it.product([0, 1], repeat=n)]
-
-    # Initialize our agent with the set parameters
-    agent = DQNAgent(len(actions), lr=learning_rate, batch_size=batch_size,
-                     memory_size=replay_memory_size, discount_factor=discount_factor,
-                     load_model=load_model, scheduler=True)
-
-    # Run the training for the set number of epochs
-    if not skip_learning:
-        agent, game = run(game, agent, actions, num_epochs=train_epochs, frame_repeat=frame_repeat,
-                          steps_per_epoch=learning_steps_per_epoch)
-
-        print("======================================")
-        print("Training finished. It's time to watch!")
-
-    # Reinitialize the game with window visible
-    game.close()
-    game.set_window_visible(True)
-    game.set_mode(Mode.ASYNC_PLAYER)
-    game.init()
-
-    for _ in range(episodes_to_watch):
-        game.new_episode()
-        while not game.is_episode_finished():
-            state = preprocess(game.get_state().screen_buffer)
-            best_action_index = agent.get_action(state)
-
-            # Instead of make_action(a, frame_repeat) in order to make the animation smooth
-            game.set_action(actions[best_action_index])
-            for _ in range(frame_repeat):
-                game.advance_action()
-
-        # Sleep between episodes
-        sleep(1.0)
-        score = game.get_total_reward()
-        print("Total score: ", score)
-"""

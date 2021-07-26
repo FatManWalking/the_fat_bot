@@ -11,9 +11,10 @@ And the Github https://github.com/amanda-lambda/drl-experiments/blob/master/ppo.
 --> A PPO implementation for Flappy Bird
 """
 
-from new_ppo import *
+from PPO import *
 from DQN import *
 import torch
+import skimage.transform
 
 from vizdoom import Mode
 import vizdoom as vzd
@@ -155,8 +156,12 @@ parser.add_argument("--watch_episodes",
                     type=int,
                     help="number of episode to watch",
                     default=10)
+parser.add_argument("--save_freq",
+                    type=int,
+                    help="number of episode to train before saving",
+                    default=5)
 
-
+# Source: Vizdoom 
 def create_simple_game(config_file_path):
     """
     creates a simple run of the game to train the agent(s)
@@ -176,6 +181,7 @@ def create_simple_game(config_file_path):
 
     return game
 
+# Source: Vizdoom 
 def preprocess(img, resultion):
     """Down samples image to resolution"""
     img = skimage.transform.resize(img, resultion)
@@ -183,27 +189,28 @@ def preprocess(img, resultion):
     img = np.expand_dims(img, axis=0)
     return img
 
+# Source: Vizdoom 
 def test(game, agent, options):
     """Runs a test_episodes_per_epoch episodes and prints the result"""
     print("\nTesting...")
     test_scores = []
-    for test_episode in trange(options.test_episodes, leave=False):
+    for _ in trange(options.test_episodes, leave=False):
         game.new_episode()
         while not game.is_episode_finished():
             state = preprocess(game.get_state().screen_buffer, options.resultion)
-            best_action_index = agent.get_action(state)
-
+            best_action_index, _, _ = agent.act(state)
             game.make_action(actions[best_action_index], options.frame_repeat)
-        r = game.get_total_reward()
-        test_scores.append(r)
+            
+        reward = game.get_total_reward()
+        test_scores.append(reward)
 
     test_scores = np.array(test_scores)
     print("Results: mean: %.1f +/- %.1f," % (
         test_scores.mean(), test_scores.std()), "min: %.1f" % test_scores.min(),
           "max: %.1f" % test_scores.max())
 
-# TODO: implement having more than one worker
-def run(game, agent, actions, options, steps_per_epoch=2000):
+# Removed hardcoded parameters and replaced them with dynamic solultions
+def run(game, agent, actions, options):
     """
     Run num epochs of training episodes.
     Skip frame_repeat number of frames after each action.
@@ -217,16 +224,17 @@ def run(game, agent, actions, options, steps_per_epoch=2000):
         global_step = 0
         print("\nEpoch #" + str(epoch + 1))
 
-        for _ in trange(steps_per_epoch, leave=False):
+        for _ in trange(options.steps, leave=False):
             state = preprocess(game.get_state().screen_buffer, options.resultion)
-            action = agent.get_action(state)
+            action, _, _ = agent.act(state)
             reward = game.make_action(actions[action], options.frame_repeat)
             done = game.is_episode_finished()
 
             if not done:
                 next_state = preprocess(game.get_state().screen_buffer, options.resultion)
             else:
-                next_state = np.zeros((1, 90, 135)).astype(np.float32) # 30x45 = 30x45
+                x = (1,) + options.resultion
+                next_state = np.zeros(x).astype(np.float32)
 
             agent.append_memory(state, action, reward, next_state, done)
 
@@ -250,7 +258,7 @@ def run(game, agent, actions, options, steps_per_epoch=2000):
               "min: %.1f," % train_scores.min(), "max: %.1f," % train_scores.max())
 
         test(game, agent, options)
-        if options.model_name:
+        if options.model_name and not (epoch%options.save_freq):
             print("Saving the network weights to:", options.model_name)
             torch.save(agent.q_net, options.model_name)
         print("Total elapsed time: %.2f minutes" % ((time() - start_time) / 60.0))
@@ -283,10 +291,10 @@ if __name__ == '__main__':
     # Initialize our agent with the set parameters
     
     if options.model == 'PPO':
-        agent = PPOAgent(options, len(actions))
+        agent = PPOAgent(options, len(actions), scheduler=True)
         
     elif options.model == 'DQN':
-        agent = DQNAgent(options, len(actions))
+        agent = DQNAgent(options, len(actions), scheduler=True)
 
     # Run the training for the set number of epochs
     if options.mode == 'train':
@@ -306,7 +314,7 @@ if __name__ == '__main__':
         games.new_episode()
         while not game.is_episode_finished():
             state = preprocess(games.get_state().screen_buffer, options.resultion)
-            best_action_index = agent.get_action(state)
+            best_action_index, _, _ = agent.act(state)
 
             # Instead of make_action(a, frame_repeat) in order to make the animation smooth
             game.set_action(actions[best_action_index])
