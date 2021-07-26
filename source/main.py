@@ -305,7 +305,7 @@ if __name__ == '__main__':
     for _ in range(options.watch_episodes):
         games.new_episode()
         while not game.is_episode_finished():
-            state = preprocess(games.get_state().screen_buffer)
+            state = preprocess(games.get_state().screen_buffer, options.resultion)
             best_action_index = agent.get_action(state)
 
             # Instead of make_action(a, frame_repeat) in order to make the animation smooth
