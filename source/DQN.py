@@ -12,48 +12,26 @@ import numpy as np
 import random
 
 from vizdoom import Mode
-from time import sleep, time
+from time import sleep
 from collections import deque
-from tqdm import trange
 from collections import namedtuple
 
 from base import Agent, Model
 
-# Other parameters
-frame_repeat = 12
-resolution = (90, 135)
+# Uses GPU if available
+if torch.cuda.is_available():
+    DEVICE = torch.device('cuda')
+    torch.backends.cudnn.benchmark = True
+else:
+    DEVICE = torch.device('cpu')
 
-class DuelQNet(nn.Module):
+class DuelQNet(Model):
     """
     This is Duel DQN architecture.
     see https://arxiv.org/abs/1511.06581 for more information.
     """
-
-    def __init__(self, available_actions_count):
-        super(DuelQNet, self).__init__()
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=3, stride=2, bias=False),
-            nn.BatchNorm2d(8),
-            nn.ReLU()
-        )
-
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(8, 8, kernel_size=3, stride=2, bias=False),
-            nn.BatchNorm2d(8),
-            nn.ReLU()
-        )
-
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(8, 8, kernel_size=3, stride=1, bias=False),
-            nn.BatchNorm2d(8),
-            nn.ReLU()
-        )
-
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(8, 16, kernel_size=3, stride=1, bias=False),
-            nn.BatchNorm2d(16),
-            nn.ReLU()
-        )
+    def __init__(self, available_actions_count) -> None:
+        super().__init__(available_actions_count)
 
         self.state_fc = nn.Sequential(
             nn.Linear(3944, 64), # 30 x 45 = 96, 64
@@ -66,16 +44,15 @@ class DuelQNet(nn.Module):
             nn.ReLU(),
             nn.Linear(64, available_actions_count)
         )
+    
+    def initialize_weights(self, layer):
+        return super().initialize_weights(layer)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        #print(x.shape)
-        x = x.view(-1, 7888) # 30x45 = 192
-        x1 = x[:, :3944]  # input for the net to calculate the state value # 30x45 = 96
-        x2 = x[:, 3944:]  # relative advantage of actions in the state
+        x, size = super().forward(x)
+        size = int(size//2)
+        x1 = x[:, :size]  # input for the net to calculate the state value # 30x45 = 96
+        x2 = x[:, size:]  # relative advantage of actions in the state
         state_value = self.state_fc(x1).reshape(-1, 1)
         advantage_values = self.advantage_fc(x2)
         x = state_value + (advantage_values - advantage_values.mean(dim=1).reshape(-1, 1))
@@ -83,23 +60,17 @@ class DuelQNet(nn.Module):
         return x
 
 class DQNAgent:
-    def __init__(self, action_size, memory_size, batch_size, discount_factor, 
-                 lr, load_model, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1, scheduler=None):
+    def __init__(self, action_size, options, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1, scheduler=None):
 
         self.action_size = action_size
-        self.epsilon = epsilon
-        self.epsilon_decay = epsilon_decay
-        self.epsilon_min = epsilon_min
-        self.batch_size = batch_size
-        self.discount = discount_factor
-        self.lr = lr
-        self.memory = deque(maxlen=memory_size)
+        self.opt = options
+        self.memory = deque(maxlen=options.memory_size)
         self.criterion = nn.MSELoss()
 
-        if load_model:
-            print("Loading model from: ", model_savefile)
-            self.q_net = torch.load(model_savefile)
-            self.target_net = torch.load(model_savefile)
+        if options.load_model:
+            print("Loading model from: ", options.weights_dir)
+            self.q_net = torch.load(options.weights_dir)
+            self.target_net = torch.load(options.weights_dir)
             self.epsilon = self.epsilon_min
 
         else:
@@ -107,11 +78,11 @@ class DQNAgent:
             self.q_net = DuelQNet(action_size).to(DEVICE)
             self.target_net = DuelQNet(action_size).to(DEVICE)
 
-        self.opt = optim.SGD(self.q_net.parameters(), lr=self.lr)
+        self.optim = optim.SGD(self.q_net.parameters(), lr=options.learning_rate)
 
         if scheduler:
             # self.scheduler = CosineScheduler(30, warmup_steps=5, base_lr=self.lr, final_lr=self.lr*0.0001)
-            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.opt, 30, eta_min=0, last_epoch=-1, verbose=False)
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optim, 30, eta_min=0, last_epoch=-1, verbose=False)
         else:
             self.scheduler = None
 
@@ -162,9 +133,9 @@ class DQNAgent:
         states = torch.from_numpy(states).float().to(DEVICE)
         action_values = self.q_net(states)[idx].float().to(DEVICE)
 
-        self.opt.zero_grad()
+        self.optim.zero_grad()
         td_error = self.criterion(q_targets, action_values)
-        self.opt.step()
+        self.optim.step()
 
         if self.scheduler:
             if self.scheduler.__module__ == optim.lr_scheduler.__name__:

@@ -149,8 +149,8 @@ class ActorCritc(Model):
             x (tensor): the state input
             type (string): "actor" or "critic"
         """
-        # gets the convulted and flattend input back
-        x = super().forward(x)
+        # gets the convulted and flattend input back as well as the size of the tenor
+        x, _ = super().forward(x)
         
         if self.type=='actor':
             x = self.actor(x)
