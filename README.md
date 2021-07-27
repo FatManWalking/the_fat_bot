@@ -108,7 +108,7 @@ Directory that will automatically be created, when not given and stores the rewa
 Containing configuration files and the according .wad file for it. Use matching files when running the code.
 
 ## Results
-The full evaluation of our Results can be read in the [attached paper](https://github.com/FatManWalking/the_fat_bot/blob/main/TheFatBot%20-%20DOOM%20for%20reinforcement%20learning.pdf) documenting our thought process, theoretical overview, implementation and accomplished results. The final presentation of the project was made using the following [presentation]
+The full evaluation of our Results can be read in the [attached paper](https://github.com/FatManWalking/the_fat_bot/blob/main/TheFatBot%20-%20DOOM%20for%20reinforcement%20learning.pdf) documenting our thought process, theoretical overview, implementation and accomplished results. The final presentation of the project was made using the following [presentation](https://github.com/FatManWalking/the_fat_bot/blob/main/TheFatBotPresentation.pdf)
 
 (Use Light Mode on GitHub to read the axis)
 In short we tried different hyperparameter combinations in different enviroments and got mixed results.
