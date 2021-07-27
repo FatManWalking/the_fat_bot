@@ -103,10 +103,10 @@ Directory that will automatically be created, when not given and stores the weig
 Directory that will automatically be created, when not given and stores the rewards earned per epoch. Was used to visualize the progress and analyzing needed changes to the enviroment, scripts and rewards.
 
 ### `\scenarios`
-Containing configuration files and the according .wad file for it. Use matchin files when running the code.
+Containing configuration files and the according .wad file for it. Use matching files when running the code.
 
 ## Results
-The full evalution of our Results can be read in the attached paper [EINFÜGEN] documenting our though process, theortical overview, implementation and accomplished results.
+The full evalution of our Results can be read in the [attached paper](https://github.com/FatManWalking/the_fat_bot/blob/main/TheFatBot%20-%20DOOM%20for%20reinforcement%20learning.pdf) documenting our though process, theortical overview, implementation and accomplished results.
 
 (Use Light Mode on GitHub to read the axis)
 In short we tried different hyperparameter combinations in different enviroments and got mixed results.
