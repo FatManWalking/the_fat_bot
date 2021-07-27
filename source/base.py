@@ -130,16 +130,12 @@ class Agent(ABC):
 class Model(ABC, nn.Module):
     
     @abstractmethod
-<<<<<<< HEAD
-    def __init__(self, available_actions_count) -> None:
+    def __init__(self, available_actions_count, input_shape) -> None:
         """defining the CNN architecture for the Agent to decide with
 
         Args:
             available_actions_count (int): numbers of actions the agent can take in a single step
         """
-=======
-    def __init__(self, available_actions_count, input_shape) -> None:
->>>>>>> 8e322f8440b6505c0afbd2844fca9cacbd35b015
         super().__init__()
         
         self.input_shape = (1, ) + input_shape
