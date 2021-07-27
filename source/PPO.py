@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
-import vizdoom as vzd
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -10,10 +10,6 @@ from torch.distributions import Categorical
 
 import numpy as np
 
-from vizdoom import Mode
-from time import sleep, time
-from collections import deque
-from tqdm import trange
 from collections import namedtuple
 
 from base import Agent, Model
