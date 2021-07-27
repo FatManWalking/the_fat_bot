@@ -114,10 +114,10 @@ class Agent(ABC):
 class Model(ABC, nn.Module):
     
     @abstractmethod
-    def __init__(self, available_actions_count) -> None:
+    def __init__(self, available_actions_count, input_shape) -> None:
         super().__init__()
         
-        
+        self.input_shape = (1, ) + input_shape
         self.convultions = nn.Sequential(
             # Conv Layer 1
             nn.Conv2d(1, 8, kernel_size=3, stride=2, bias=False),
@@ -201,7 +201,7 @@ class Model(ABC, nn.Module):
         
     @abstractmethod
     def feature_size(self):
-        return self.features(autograd.Variable(torch.zeros(1, *self.input_shape))).view(1, -1).size(1)
+        return self.convultions(autograd.Variable(torch.zeros(1, * self.input_shape))).view(1, -1).size(1)
     
     
     
