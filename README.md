@@ -6,7 +6,7 @@ We personally recommend the setup over a Linux-Setup, which was also the only se
 We also provide a YAML `Doom_Yaml.yml`, which we know is a functional conda enviroment for this project.
 
 ## ⚙️ Running the code
-Almost every parameter is adjustable via terminal commands when executing the code. For a full list of options scroll thorugh the `source/main.py`
+Almost every parameter is adjustable via terminal commands when executing the code.
 
 Examples:
 ```sh
@@ -19,7 +19,67 @@ python main.py --model=a2c --scene=./wads/New.cfg
 # To watch a game using DQN:
 python main.py --model=dqn --skip_training=True --weights_dir=../models/DuelQ_from_basic.pth
 ```
+For help use 
+```sh
+python main.py -h
 
+usage: main.py [-h] [--scene SCENE] [--frame_repeat FRAME_REPEAT] [--model_name MODEL_NAME] [--weights_dir WEIGHTS_DIR] [--text_file TEXT_FILE] [--model {DQN,PPO}] [--epochs EPOCHS]
+               [--steps STEPS] [--batch_size BATCH_SIZE] [--learning_rate LEARNING_RATE] [--memory_size MEMORY_SIZE] [--discount_factor DISCOUNT_FACTOR] [--resultion RESULTION]
+               [--n_workers N_WORKERS] [--buffer_update_freq BUFFER_UPDATE_FREQ] [--entropy_coeff ENTROPY_COEFF] [--value_loss_coeff VALUE_LOSS_COEFF] [--max_grad_norm MAX_GRAD_NORM]
+               [--grad_clip GRAD_CLIP] [--save_model SAVE_MODEL] [--load_model LOAD_MODEL] [--skip_training SKIP_TRAINING] [--test_episodes TEST_EPISODES] [--watch_episodes WATCH_EPISODES]
+               [--save_freq SAVE_FREQ]
+
+options
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --scene SCENE         run a specific .cfg and .wad
+  --frame_repeat FRAME_REPEAT
+                        repeat frame n times
+  --model_name MODEL_NAME
+                        name of experiment, to be used as save_dir
+  --weights_dir WEIGHTS_DIR
+                        name of model to load
+  --text_file TEXT_FILE
+                        name of model to load
+  --model {DQN,PPO}     the model architecture
+  --epochs EPOCHS       number of iterations to train network
+  --steps STEPS         number of steps per episode
+  --batch_size BATCH_SIZE
+                        number of states per batch
+  --learning_rate LEARNING_RATE
+                        learning rate
+  --memory_size MEMORY_SIZE
+                        number of states to keep in memory for batching
+  --discount_factor DISCOUNT_FACTOR
+                        discount factor used for discounting return
+  --resultion RESULTION
+                        resultion used for training
+  --n_workers N_WORKERS
+                        number of actor critic workers
+  --buffer_update_freq BUFFER_UPDATE_FREQ
+                        refresh buffer after every x actions
+  --entropy_coeff ENTROPY_COEFF
+                        entropy regularization weight
+  --value_loss_coeff VALUE_LOSS_COEFF
+                        value loss regularization weight
+  --max_grad_norm MAX_GRAD_NORM
+                        norm bound for clipping gradients
+  --grad_clip GRAD_CLIP
+                        magnitude bound for clipping gradients
+  --save_model SAVE_MODEL
+                        save model after training
+  --load_model LOAD_MODEL
+                        load model before training
+  --skip_training SKIP_TRAINING
+                        skip training
+  --test_episodes TEST_EPISODES
+                        number of episode to test
+  --watch_episodes WATCH_EPISODES
+                        number of episode to watch
+  --save_freq SAVE_FREQ
+                        number of episode to train before saving
+```
 ## How to navigate this project
 ### `\lib`
 Contains references and directories which have been added and worked with in the devolopment of this project
