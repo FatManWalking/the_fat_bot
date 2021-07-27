@@ -102,9 +102,16 @@ Directory that will automatically be created, when not given and stores the weig
 ### `\rewards`
 Directory that will automatically be created, when not given and stores the rewards earned per epoch. Was used to visualize the progress and analyzing needed changes to the enviroment, scripts and rewards.
 
-### `\other`
-Hier könnte ihr Ordner stehen, für nur 3.99€ im Monat. Lass sie jetzt hier ihren Ordner anzeigen.
-@Dickermann 3.99 viel zu teuer du großkapitalist. Das alles sollte öffentlich kostenlos zugänglich sein
+### `\wads` and `\scenarios`
+Serve the same purpose: Containing configuration files and the according .wad file for it.
+
+## Results
+The full evalution of our Results can be read in the attached paper [EINFÜGEN] documenting our though process, theortical overview, implementation and accomplished results.
+
+In short we tried different hyperparameter combinations in different enviroments and got mixed results.
+As you can see there are certain pikes in the reward based performance:
+![Different Plots](https://user-images.githubusercontent.com/46927512/127165861-e5167b0c-4c64-4958-8afb-f92156f25123.png)
+
 
 
 Google Drive mit allen Modellen, Wads und was es sonst so zu dem Projekt gibt: [DOOM-Ordner](https://drive.google.com/drive/folders/1rHizC5ppqcJWElBOVd-HAEOcjqUoW5lT?usp=sharing)
