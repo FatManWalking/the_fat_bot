@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 from __future__ import print_function
 
 import torch
@@ -9,13 +6,7 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 import numpy as np
-
-from collections import namedtuple
-
 from base import Agent, Model
-
-# A named tuple to save information about steps that have been performed by the net and what came back from the net
-Experience = namedtuple('Experience', ('state', 'action', 'action_log_prob', 'value', 'reward', 'mask'))
    
 class ActorCritc(Model):
     
