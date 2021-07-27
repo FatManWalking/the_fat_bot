@@ -67,6 +67,7 @@ class DuelQNet(Model):
 
         return x
 
+
 class DQNAgent(Agent):
 
     def __init__(self, options, action_size, epsilon=1, epsilon_decay=0.9996, epsilon_min=0.1, scheduler=None) -> None:
