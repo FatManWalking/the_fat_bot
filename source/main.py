@@ -49,7 +49,7 @@ parser.add_argument("--frame_repeat",
 parser.add_argument("--model_name",
                     type=str,
                     help="name of experiment, to be used as save_dir",
-                    default="../models/DuelQ_from_basic.pth")
+                    default="../models/DuelQ_d0.95_lr25e-4.pth")
 parser.add_argument("--weights_dir",
                     type=str,
                     help="name of model to load",
@@ -80,7 +80,7 @@ parser.add_argument("--batch_size",
 parser.add_argument("--learning_rate",
                     type=float,
                     help="learning rate",
-                    default=1e-5) # PPO 1e-5
+                    default=25e-3) # PPO 1e-5
 parser.add_argument("--memory_size",
                     type=int,
                     help="number of states to keep in memory for batching",
@@ -88,7 +88,7 @@ parser.add_argument("--memory_size",
 parser.add_argument("--discount_factor",
                     type=float,
                     help="discount factor used for discounting return",
-                    default=0.99)
+                    default=0.95)
 parser.add_argument("--resultion",
                     type=tuple,
                     help="resultion used for training",
@@ -138,7 +138,7 @@ parser.add_argument("--save_model",
 parser.add_argument("--load_model",
                     type=bool,
                     help="load model before training",
-                    default=True)
+                    default=False)
 parser.add_argument("--skip_training",
                     type=bool,
                     help="skip training",
