@@ -1,10 +1,13 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# File for imitation learning on the new basic.wad to compare it to basic reinforcement learning
 
-# E. Culurciello, L. Mueller, Z. Boztoprak
-# December 2020
+from __future__ import print_function
 
+from time import sleep
 import vizdoom as vzd
+from argparse import ArgumentParser
+
+DEFAULT_CONFIG = "lib/ViZDoom/scenarios/basic.cfg"
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -25,11 +28,14 @@ train_epochs = 5
 learning_steps_per_epoch = 2000
 replay_memory_size = 10000
 
+# Tell the agent to get actions in a supervised manner
+supervised = True
+
 # NN learning settings
 batch_size = 64
 
 # Training regime
-test_episodes_per_epoch = 100
+test_episodes_per_epoch = 10#0
 
 # Other parameters
 frame_repeat = 12
@@ -39,12 +45,12 @@ episodes_to_watch = 10
 model_savefile = "./model-doom.pth"
 save_model = True
 load_model = False
-skip_learning = True
+skip_learning = False
 
 # Configuration file path
-config_file_path = "../scenarios/bottrop.cfg"
+# config_file_path = "../../scenarios/simpler_basic.cfg"
 # config_file_path = "../../scenarios/rocket_basic.cfg"
-# config_file_path = "../../scenarios/basic.cfg"
+config_file_path = DEFAULT_CONFIG
 
 # Uses GPU if available
 if torch.cuda.is_available():
@@ -61,20 +67,24 @@ def preprocess(img):
     img = np.expand_dims(img, axis=0)
     return img
 
-
 def create_simple_game():
     print("Initializing doom...")
     game = vzd.DoomGame()
     game.load_config(config_file_path)
-    game.set_window_visible(False)
-    game.set_mode(Mode.PLAYER)
-    game.set_screen_format(vzd.ScreenFormat.GRAY8)
+
+    # Enables freelook in engine
+    # game.add_game_args("+freelook 1")
+
+    # Enables spectator mode, so you can play. Sounds strange but it is the agent who is supposed to watch not you.
+    game.set_window_visible(True)
+    game.set_mode(vzd.Mode.SPECTATOR)
+    game.set_screen_format(vzd.ScreenFormat.RGB24)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
+
     game.init()
     print("Doom initialized.")
 
     return game
-
 
 def test(game, agent):
     """Runs a test_episodes_per_epoch episodes and prints the result"""
@@ -95,7 +105,6 @@ def test(game, agent):
         test_scores.mean(), test_scores.std()), "min: %.1f" % test_scores.min(),
           "max: %.1f" % test_scores.max())
 
-
 def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
     """
     Run num epochs of training episodes.
@@ -111,9 +120,23 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
         print("\nEpoch #" + str(epoch + 1))
 
         for _ in trange(steps_per_epoch, leave=False):
+
+            # One episode is 1 action performed in the current state and the reward given
             state = preprocess(game.get_state().screen_buffer)
-            action = agent.get_action(state)
-            reward = game.make_action(actions[action], frame_repeat)
+
+            # Get the supervised action here
+            #TODO: Make sure every state gets a corresponding action somehow as transmitted in actions
+            game.advance_action()
+            last_action = game.get_last_action()
+            reward = game.get_last_reward()
+
+            map_supervised_action(last_action, actions)
+
+            print("Action:", last_action)
+            print("Reward:", reward)
+            print("=====================")
+
+            #reward = game.make_action(actions[action], frame_repeat)
             done = game.is_episode_finished()
 
             if not done:
@@ -121,16 +144,24 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
             else:
                 next_state = np.zeros((1, 30, 45)).astype(np.float32)
 
-            agent.append_memory(state, action, reward, next_state, done)
+            agent.append_memory(state, last_action, reward, next_state, done)
 
+            # performed actions are given as training examples to the agent after one batch is finished
             if global_step > agent.batch_size:
+                #TODO: Bugfix
                 agent.train()
 
+            # finished the episode by completing the target
             if done:
                 train_scores.append(game.get_total_reward())
                 game.new_episode()
 
             global_step += 1
+        
+        print("Episode finished!")
+        print("Total reward:", game.get_total_reward())
+        print("************************")
+        sleep(2.0)
 
         agent.update_target_net()
         train_scores = np.array(train_scores)
@@ -147,6 +178,34 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
     game.close()
     return agent, game
 
+def map_supervised_action(last_action, actions):
+    # This function takes the recorded action and maps it to a actions combination for the DuelQ Agent
+    pass
+
+# old if __name__==__main__ of learning_pytorch.py
+def result():    
+
+    # Reinitialize the game with window visible
+    game.close()
+    # game.set_window_visible(True)
+    game.set_mode(Mode.ASYNC_PLAYER)
+    game.init()
+
+    for _ in range(episodes_to_watch):
+        game.new_episode()
+        while not game.is_episode_finished():
+            state = preprocess(game.get_state().screen_buffer)
+            best_action_index = agent.get_action(state)
+
+            # Instead of make_action(a, frame_repeat) in order to make the animation smooth
+            game.set_action(actions[best_action_index])
+            for _ in range(frame_repeat):
+                game.advance_action()
+
+        # Sleep between episodes
+        sleep(1.0)
+        score = game.get_total_reward()
+        print("Total score: ", score)
 
 class DuelQNet(nn.Module):
     """
@@ -233,6 +292,7 @@ class DQNAgent:
         self.opt = optim.SGD(self.q_net.parameters(), lr=self.lr)
 
     def get_action(self, state):
+
         if np.random.uniform() < self.epsilon:
             return random.choice(range(self.action_size))
         else:
@@ -252,8 +312,14 @@ class DQNAgent:
         batch = np.array(batch, dtype=object)
 
         states = np.stack(batch[:, 0]).astype(float)
-        actions = batch[:, 1].astype(int)
+
+        actions = self.remap_actions(batch[:, 1])
+        # actions = batch[:, 1].astype(int)
+
         rewards = batch[:, 2].astype(float)
+        with open('batch_stack.txt', 'w') as f:
+            f.write(str(batch[:, 3]))
+        print(batch[:, 3].shape)
         next_states = np.stack(batch[:, 3]).astype(float)
         dones = batch[:, 4].astype(bool)
         not_dones = ~dones
@@ -287,18 +353,51 @@ class DQNAgent:
             self.epsilon *= self.epsilon_decay
         else:
             self.epsilon = self.epsilon_min
+    
+    def remap_actions(self, actions):
+
+        dic = {
+            tuple(list([0, 0, 0])) : 0,
+            tuple(list([0, 0, 1])) : 1,
+            tuple(list([0, 1, 0])) : 2,
+            tuple(list([0, 1, 1])) : 3,
+            tuple(list([1, 0, 0])) : 4,
+            tuple(list([1, 0, 1])) : 5,
+            tuple(list([1, 1, 0])) : 6,
+            tuple(list([1, 1, 1])) : 7
+        }
+
+        actions = [dic[tuple(action)] for action in actions]
+
+        return np.array(actions).astype(int)
 
 
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser("ViZDoom example showing how to use SPECTATOR mode.")
+    parser.add_argument(dest="config",
+                        default=DEFAULT_CONFIG,
+                        nargs="?",
+                        help="Path to the configuration file of the scenario."
+                             " Please see "
+                             "../../scenarios/*cfg for more scenarios.")
+    args = parser.parse_args()
+    #game = vzd.DoomGame()
+
     # Initialize game and actions
     game = create_simple_game()
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
 
+    print(actions)
+
     # Initialize our agent with the set parameters
     agent = DQNAgent(len(actions), lr=learning_rate, batch_size=batch_size,
                      memory_size=replay_memory_size, discount_factor=discount_factor,
                      load_model=load_model)
+
+    episodes = 10
 
     # Run the training for the set number of epochs
     if not skip_learning:
@@ -308,24 +407,4 @@ if __name__ == '__main__':
         print("======================================")
         print("Training finished. It's time to watch!")
 
-    # Reinitialize the game with window visible
     game.close()
-    game.set_window_visible(True)
-    game.set_mode(Mode.ASYNC_PLAYER)
-    game.init()
-
-    for _ in range(episodes_to_watch):
-        game.new_episode()
-        while not game.is_episode_finished():
-            state = preprocess(game.get_state().screen_buffer)
-            best_action_index = agent.get_action(state)
-
-            # Instead of make_action(a, frame_repeat) in order to make the animation smooth
-            game.set_action(actions[best_action_index])
-            for _ in range(frame_repeat):
-                game.advance_action()
-
-        # Sleep between episodes
-        sleep(1.0)
-        score = game.get_total_reward()
-        print("Total score: ", score)
