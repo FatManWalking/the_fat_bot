@@ -39,7 +39,7 @@ parser = argparse.ArgumentParser(description="options")
 parser.add_argument("--scene",
                     type=str,
                     help="run a specific .cfg and .wad",
-                    default="../wads/BasicAugment.cfg")
+                    default="../wads/New.cfg")
 parser.add_argument("--frame_repeat",
                     type=int,
                     help="repeat frame n times",
@@ -297,7 +297,7 @@ if __name__ == '__main__':
         agent = DQNAgent(options, len(actions), scheduler=True)
 
     # Run the training for the set number of epochs
-    if options.skip_training:
+    if not options.skip_training:
         
         agent, game = run(game, agent, actions, options)
 
