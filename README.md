@@ -102,7 +102,7 @@ Directory that will automatically be created, when not given and stores the weig
 ### `\rewards`
 Directory that will automatically be created, when not given and stores the rewards earned per epoch. Was used to visualize the progress and analyzing needed changes to the enviroment, scripts and rewards.
 
-### `\wads` and `\scenarios`
+### `\scenarios`
 Serve the same purpose: Containing configuration files and the according .wad file for it.
 
 ## Results
