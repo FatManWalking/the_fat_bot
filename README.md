@@ -5,6 +5,9 @@ This project is based on VizDoom. To run vizdoom follow this [Guide](https://git
 We personally recommend the setup over a Linux-Setup, which was also the only setup we developed this project in (Ubuntu 20.4).
 We also provide a YAML `Doom_Yaml.yml`, which we know is a functional conda enviroment for this project.
 
+![img](https://imgur.com/lHclExd)
+
+
 ## ⚙️ Running the code
 Almost every parameter is adjustable via terminal commands when executing the code.
 
