@@ -5,6 +5,21 @@ This project is based on VizDoom. To run vizdoom follow this [Guide](https://git
 We personally recommend the setup over a Linux-Setup, which was also the only setup we developed this project in (Ubuntu 20.4).
 We also provide a YAML `Doom_Yaml.yml`, which we know is a functional conda enviroment for this project.
 
+## ⚙️ Running the code
+Almost every parameter is adjustable via terminal commands when executing the code. For a full list of options scroll thorugh the `source/main.py`
+
+Examples:
+```sh
+# General format of commands
+python main.py --model=<DQN, PPO> --epochs=<100>
+
+# So, for example, to train DQN from the Enviroment "./wads/New.cfg":
+python main.py --model=a2c --scene=./wads/New.cfg
+
+# To watch a game using DQN:
+python main.py --model=dqn --skip_training=True --weights_dir=../models/DuelQ_from_basic.pth
+```
+
 ## How to navigate this project
 ### `\lib`
 Contains references and directories which have been added and worked with in the devolopment of this project
