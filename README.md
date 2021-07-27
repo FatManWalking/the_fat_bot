@@ -108,6 +108,7 @@ Serve the same purpose: Containing configuration files and the according .wad fi
 ## Results
 The full evalution of our Results can be read in the attached paper [EINFÜGEN] documenting our though process, theortical overview, implementation and accomplished results.
 
+(Use Light Mode on GitHub to read the axis)
 In short we tried different hyperparameter combinations in different enviroments and got mixed results.
 As you can see there are certain pikes in the reward based performance:
 ![Different Plots](https://user-images.githubusercontent.com/46927512/127165861-e5167b0c-4c64-4958-8afb-f92156f25123.png)
