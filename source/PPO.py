@@ -62,6 +62,7 @@ class ActorCritc(Model):
 class PPOAgent(Agent):
     
     def __init__(self, options, action_size, scheduler) -> None:
+        
         super().__init__(options, action_size)
         
         self.actor_model = ActorCritc(action_size, "actor")
@@ -86,24 +87,29 @@ class PPOAgent(Agent):
     def get_scheduler(self, scheduler):
         return super().get_scheduler(scheduler)
     
-    def step(self, states, actions, action_log_probs, values, rewards, masks, next_state):
+    def append_memory(self, states, actions, action_log_probs, values, rewards, masks, next_state):
         self.memory.append((states, actions, action_log_probs, values, rewards, masks))
-        
-        self.steps_taken = (self.steps_taken + 1) % self.opt.buffer_update_freq
-        
-        if self.steps_taken == 0:
-            self.optimize(next_state)
-            self.memory = []
     
     def act(self, state):
-        """Returns action, log_prob, value for given state as per current policy."""
+        """performs either a random action or based on the networt
+
+        Args:
+            state (image): the current game state
+
+        Returns:
+            action (int): the action to perform from the list of options
+        """
         
-        state = torch.from_numpy(state).unsqueeze(0).to(self.device)
+        state = np.expand_dims(state, axis=0)
         action_probs = self.actor_model(state)
         value = self.critic_model(state)
 
         action = action_probs.sample()
         log_prob = action_probs.log_prob(action)
+        
+        #TODO: last checkpoint
+        print("Hello there, General Kenobi")
+        print(action.item(), log_prob, value)
 
         return action.item(), log_prob, value
     
