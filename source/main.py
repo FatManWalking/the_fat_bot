@@ -297,7 +297,7 @@ if __name__ == '__main__':
         agent = DQNAgent(options, len(actions), scheduler=True)
 
     # Run the training for the set number of epochs
-    if options.skip_training == 'train':
+    if options.skip_training:
         
         agent, game = run(game, agent, actions, options)
 

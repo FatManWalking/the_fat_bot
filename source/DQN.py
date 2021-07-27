@@ -26,13 +26,13 @@ class DuelQNet(Model):
     This is Duel DQN architecture.
     see https://arxiv.org/abs/1511.06581 for more information.
     """
-    def __init__(self, available_actions_count) -> None:
+    def __init__(self, available_actions_count, input_shape) -> None:
         #self.convultions, self.softmax, self.logsoftmax = 
-        super().__init__(available_actions_count)
+        super().__init__(available_actions_count, input_shape)
         
         # Linear Layers for the q_net it self and the target network
         self.state_fc = nn.Sequential(
-            nn.Linear(3944, 256), # 30 x 45 = 96, 64
+            nn.Linear(self.feature_size(), 256), # 30 x 45 = 96, 64
             nn.ReLU(),
             nn.Linear(256, 64),
             nn.ReLU(),
@@ -40,7 +40,7 @@ class DuelQNet(Model):
         )
 
         self.advantage_fc = nn.Sequential(
-            nn.Linear(3944, 256), # 30 x 45 = 96, 64
+            nn.Linear(self.feature_size(), 256), # 30 x 45 = 96, 64
             nn.ReLU(),
             nn.Linear(256, 64),
             nn.ReLU(),
@@ -51,7 +51,7 @@ class DuelQNet(Model):
         return super().initialize_weights(layer)
     
     def feature_size(self):
-        return super().feature_size()
+        return int(super().feature_size()//2)
 
     def forward(self, x):
 
@@ -77,12 +77,12 @@ class DQNAgent(Agent):
         self.epsilon_decay = epsilon_decay
         self.epsilon_min = epsilon_min
         
-        self.q_net = DuelQNet(action_size)
-        self.target_net = DuelQNet(action_size)
+        self.q_net = DuelQNet(action_size, options.resultion)
+        self.target_net = DuelQNet(action_size, options.resultion)
         
         for model in [self.q_net, self.target_net]:
             
-            if self.opt.weights_dir != '':
+            if self.opt.weights_dir != ''  and self.opt.load_model:
                 print("Loading model from: ", self.opt.weights_dir)
                 model.load_state_dict(torch.load(self.opt.weights_dir))
                 self.epsilon = self.epsilon_min
@@ -94,9 +94,8 @@ class DQNAgent(Agent):
             
             model.to(DEVICE)
             
-        self.q_optimizer = optim.Adam(self.q_net.parameters(), lr=self.opt.learning_rate)
-        self.target_optimizer = optim.Adam(self.target_net.parameters(), lr=self.opt.learning_rate)
-        # self.optimizer = optim.SGD(self.target_net.parameters(), lr=self.opt.learning_rate)
+        self.optimizer = optim.Adam(self.q_net.parameters(), lr=self.opt.learning_rate)
+        # self.optimizer = optim.SGD(self.q_net.parameters(), lr=self.opt.learning_rate)
 
         self.scheduler = self.get_scheduler(scheduler)
 
@@ -151,10 +150,10 @@ class DQNAgent(Agent):
         action_values = self.q_net(states)[idx].float().to(DEVICE)
 
         # backwards pass through the net to recalculate the weights and biases
-        self.optim.zero_grad()
+        self.optimizer.zero_grad()
         td_error = self.criterion(q_targets, action_values)
         td_error.backward()
-        self.optim.step()
+        self.optimizer.step()
 
         if self.scheduler:
             # here is only the support for pytorch native schedulers implemented
