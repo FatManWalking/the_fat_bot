@@ -142,7 +142,7 @@ parser.add_argument("--load_model",
 parser.add_argument("--skip_training",
                     type=bool,
                     help="skip training",
-                    default=True)
+                    default=False)
 parser.add_argument("--test_episodes",
                     type=int,
                     help="number of episode to test",
@@ -154,7 +154,7 @@ parser.add_argument("--watch_episodes",
 parser.add_argument("--save_freq",
                     type=int,
                     help="number of episode to train before saving",
-                    default=5)
+                    default=10)
 
 # Source: Vizdoom 
 def create_simple_game(config_file_path):
