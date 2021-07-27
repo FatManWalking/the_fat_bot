@@ -5,7 +5,7 @@ This project is based on VizDoom. To run vizdoom follow this [Guide](https://git
 We personally recommend the setup over a Linux-Setup, which was also the only setup we developed this project in (Ubuntu 20.4).
 We also provide a YAML `Doom_Yaml.yml`, which we know is a functional conda enviroment for this project.
 
-![Scene aus VizDOOM](https://imgur.com/lHclExd)
+![Scene aus VizDOOM](https://i.imgur.com/lHclExd.png)
 
 
 ## ⚙️ Running the code
