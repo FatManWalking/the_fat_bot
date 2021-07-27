@@ -2,20 +2,14 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
-import vizdoom as vzd
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions import Categorical
 
 import numpy as np
 import random
 import math
-
-from vizdoom import Mode
-from time import sleep
-from collections import deque
-from collections import namedtuple
 
 from base import Agent, Model
 
@@ -32,12 +26,13 @@ class DuelQNet(Model):
     This is Duel DQN architecture.
     see https://arxiv.org/abs/1511.06581 for more information.
     """
-    def __init__(self, available_actions_count, input_shape) -> None:
+    def __init__(self, available_actions_count) -> None:
         #self.convultions, self.softmax, self.logsoftmax = 
-        super().__init__(available_actions_count, input_shape)
+        super().__init__(available_actions_count)
         
+        # Linear Layers for the q_net it self and the target network
         self.state_fc = nn.Sequential(
-            nn.Linear(self.feature_size(), 256), # 30 x 45 = 96, 64
+            nn.Linear(3944, 256), # 30 x 45 = 96, 64
             nn.ReLU(),
             nn.Linear(256, 64),
             nn.ReLU(),
@@ -45,7 +40,7 @@ class DuelQNet(Model):
         )
 
         self.advantage_fc = nn.Sequential(
-            nn.Linear(self.feature_size(), 256), # 30 x 45 = 96, 64
+            nn.Linear(3944, 256), # 30 x 45 = 96, 64
             nn.ReLU(),
             nn.Linear(256, 64),
             nn.ReLU(),
@@ -56,14 +51,15 @@ class DuelQNet(Model):
         return super().initialize_weights(layer)
     
     def feature_size(self):
-        return int(super().feature_size()//2)
+        return super().feature_size()
 
     def forward(self, x):
 
         x, size = super().forward(x)
         size = int(size//2)
 
-        x1 = x[:, :size]  # input for the net to calculate the state value # 30x45 = 96
+        # Splits the convulted tensor for the calculation of the state and advantage values
+        x1 = x[:, :size]  # input for the net to calculate the state value # for resultion 30x45 layer input = 96
         x2 = x[:, size:]  # relative advantage of actions in the state
         state_value = self.state_fc(x1).reshape(-1, 1)
         advantage_values = self.advantage_fc(x2)
@@ -81,12 +77,12 @@ class DQNAgent(Agent):
         self.epsilon_decay = epsilon_decay
         self.epsilon_min = epsilon_min
         
-        self.q_net = DuelQNet(action_size, options.resultion)
-        self.target_net = DuelQNet(action_size, options.resultion)
+        self.q_net = DuelQNet(action_size)
+        self.target_net = DuelQNet(action_size)
         
         for model in [self.q_net, self.target_net]:
             
-            if self.opt.weights_dir != '' and self.opt.load_model:
+            if self.opt.weights_dir != '':
                 print("Loading model from: ", self.opt.weights_dir)
                 model.load_state_dict(torch.load(self.opt.weights_dir))
                 self.epsilon = self.epsilon_min
@@ -98,8 +94,9 @@ class DQNAgent(Agent):
             
             model.to(DEVICE)
             
-        self.optimizer = optim.Adam(self.q_net.parameters(), lr=self.opt.learning_rate)
-        # self.optimizer = optim.SGD(self.q_net.parameters(), lr=self.opt.learning_rate)
+        self.q_optimizer = optim.Adam(self.q_net.parameters(), lr=self.opt.learning_rate)
+        self.target_optimizer = optim.Adam(self.target_net.parameters(), lr=self.opt.learning_rate)
+        # self.optimizer = optim.SGD(self.target_net.parameters(), lr=self.opt.learning_rate)
 
         self.scheduler = self.get_scheduler(scheduler)
 
@@ -107,7 +104,14 @@ class DQNAgent(Agent):
         return super().get_scheduler(scheduler)
     
     def act(self, state):
-        
+        """performs either a random action or based on the networt
+
+        Args:
+            state (image): the current game state
+
+        Returns:
+            action (int): the action to perform from the list of options
+        """
         if np.random.uniform() < self.epsilon:
             return random.choice(range(self.action_size)), None, None
         else:
@@ -117,13 +121,15 @@ class DQNAgent(Agent):
             return action, None, None
 
     def update_target_net(self):
+        # Update the weights in the target net to be the same as in the Q-Net
         self.target_net.load_state_dict(self.q_net.state_dict())
 
     def append_memory(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
     def train(self):
-        
+        """train the model
+        """
         states, actions, rewards, next_states, dones, not_dones, row_idx = super().train()
 
         # value of the next states with double q learning
@@ -144,16 +150,21 @@ class DQNAgent(Agent):
         states = torch.from_numpy(states).float().to(DEVICE)
         action_values = self.q_net(states)[idx].float().to(DEVICE)
 
-        self.optimizer.zero_grad()
+        # backwards pass through the net to recalculate the weights and biases
+        self.optim.zero_grad()
         td_error = self.criterion(q_targets, action_values)
         td_error.backward()
-        self.optimizer.step()
+        self.optim.step()
 
         if self.scheduler:
+            # here is only the support for pytorch native schedulers implemented
+            # custom schedulers like seen in CosineScheduler() didnt perform well for some reason
+            # so we dropped the overhead to support them
             if self.scheduler.__module__ == optim.lr_scheduler.__name__:
                 # Using PyTorch In-Built scheduler
                 self.scheduler.step()
 
+        # recalculte the epsilon value
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
         else:
