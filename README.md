@@ -1,14 +1,24 @@
 # the_fat_bot
 A reinforcement trained bot for doom, created as part of a machine learning research project at DHBW Mannheim
 
-Some files were written as jupyter notebooks while using jupytext to automatically convert them to python files to minimize meta files.
-
 ## How to navigate this project
 ### `\lib`
 Contains references and directories which have been added and worked with in the devolopment of this project
 
 ### `\source`
 Contains the original source code of the project
+`DQN.py` and `PPO.py` are the respective algorithms with that name.\
+`main.py` is the file to train and or evaluate the models and takes terminal arguments via arg_parser\
+Example: `python main.py --skip_training = True` will skip the training and only load a given model\
+`base.py` contains Abstract Base Classes used to implement both DQN and PPO. All generics part of those algorithms are called via those,
+to be able to have a clear visual difference overview between these algorithms in the code itself. This helped use when developing the project in understanding
+the algorithms and maintaining the code base easily.
+
+### `\models`
+Directory that will automatically be created, when not given and stores the weight directories of the trained models.
+
+### `\rewards`
+Directory that will automatically be created, when not given and stores the rewards earned per epoch. Was used to visualize the progress and analyzing needed changes to the enviroment, scripts and rewards.
 
 ### `\other`
 Hier könnte ihr Ordner stehen, für nur 3.99€ im Monat. Lass sie jetzt hier ihren Ordner anzeigen.
