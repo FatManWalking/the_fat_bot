@@ -1,5 +1,5 @@
 # The Fat Bot
-A reinforcement trained bot for doom, created as part of a machine learning research project at DHBW Mannheim\
+A reinforcement trained bot for doom, created as part of a machine learning research project at DHBW Mannheim
 
 This project is based on VizDoom. To run vizdoom follow this [Guide](https://github.com/mwydmuch/ViZDoom/blob/master/doc/Building.md#linux_build) provided by VizDoom itself.
 We personally recommend the setup over a Linux-Setup, which was also the only setup we developed this project in (Ubuntu 20.4).
