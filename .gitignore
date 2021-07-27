@@ -135,5 +135,5 @@ lib/ViZDoom
 source/lib/tianshou
 source/lib/ViZDoom
 
-
+models/
 rewards/
