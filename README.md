@@ -1,7 +1,9 @@
 # The Fat Bot
 A reinforcement trained bot for doom, created as part of a machine learning research project at DHBW Mannheim
 
-This project is based on VizDoom. To run vizdoom follow this [Guide](https://github.com/mwydmuch/ViZDoom/blob/master/doc/Building.md#linux_build) provided by VizDoom itself.
+## Clone this Repository
+This project is based on VizDoom. After cloning this repository by the method of your choice set up VizDOOM.\
+To run vizdoom follow this [Guide](https://github.com/mwydmuch/ViZDoom/blob/master/doc/Building.md#linux_build) provided by VizDoom itself.
 We personally recommend the setup over a Linux-Setup, which was also the only setup we developed this project in (Ubuntu 20.4).
 We also provide a YAML `Doom_Yaml.yml`, which we know is a functional conda enviroment for this project.
 
@@ -113,4 +115,4 @@ In short we tried different hyperparameter combinations in different enviroments
 As you can see there are certain pikes in the reward based performance:
 ![Different Plots](https://user-images.githubusercontent.com/46927512/127165861-e5167b0c-4c64-4958-8afb-f92156f25123.png)
 
-There also is an an Google Drive provided with project related data like metrics, wads, graphs and model files [DOOM-Folder](https://drive.google.com/drive/folders/1rHizC5ppqcJWElBOVd-HAEOcjqUoW5lT?usp=sharing)
+There also is a Google Drive provided with project related data like metrics, wads, graphs and model files [DOOM-Folder](https://drive.google.com/drive/folders/1rHizC5ppqcJWElBOVd-HAEOcjqUoW5lT?usp=sharing)
