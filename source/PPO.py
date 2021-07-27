@@ -31,7 +31,10 @@ class ActorCritc(Model):
         
     def initialize_weights(self, layer):
         return super().initialize_weights(layer)
-        
+    
+    def feature_size(self):
+        return super().feature_size()
+    
     def forward(self, x):
         """forward pass
 
@@ -55,8 +58,6 @@ class ActorCritc(Model):
         else:
             raise(NotImplementedError, "You forgot to give the type 'actor' or 'critic' for the forward pass")
     
-    def feature_size(self):
-        return super().feature_size()
 
 class PPOAgent(Agent):
     
