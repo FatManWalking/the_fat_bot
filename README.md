@@ -103,7 +103,7 @@ Directory that will automatically be created, when not given and stores the weig
 Directory that will automatically be created, when not given and stores the rewards earned per epoch. Was used to visualize the progress and analyzing needed changes to the enviroment, scripts and rewards.
 
 ### `\scenarios`
-Containing configuration files and the according .wad file for it.
+Containing configuration files and the according .wad file for it. Use matchin files when running the code.
 
 ## Results
 The full evalution of our Results can be read in the attached paper [EINFÜGEN] documenting our though process, theortical overview, implementation and accomplished results.
