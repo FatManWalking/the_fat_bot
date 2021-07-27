@@ -56,7 +56,7 @@ class Agent(ABC):
         
         # The agent has a memory where he stores states, the action he took when being in that state and things like he got for that
         # This determines how many samples there are in the memory to randomly batch from
-        self.memory = deque(maxlen=self.opt.replay_memory_size)
+        self.memory = deque(maxlen=self.opt.memory_size)
         
         # Mean Squared Error Loss Function
         self.criterion = nn.MSELoss()
@@ -130,15 +130,19 @@ class Agent(ABC):
 class Model(ABC, nn.Module):
     
     @abstractmethod
+<<<<<<< HEAD
     def __init__(self, available_actions_count) -> None:
         """defining the CNN architecture for the Agent to decide with
 
         Args:
             available_actions_count (int): numbers of actions the agent can take in a single step
         """
+=======
+    def __init__(self, available_actions_count, input_shape) -> None:
+>>>>>>> 8e322f8440b6505c0afbd2844fca9cacbd35b015
         super().__init__()
         
-        
+        self.input_shape = (1, ) + input_shape
         self.convultions = nn.Sequential(
             # Conv Layer 1
             nn.Conv2d(1, 8, kernel_size=3, stride=2, bias=False),
@@ -182,16 +186,22 @@ class Model(ABC, nn.Module):
         gain = 1
 
         if init_weight == 'orthogonal':
-            if type(layer) == nn.Conv2d or type(layer) == nn.Linear:
+            if type(layer) == nn.Conv2d:
+                nn.init.orthogonal_(layer.weight.data, gain=gain)
+            elif type(layer) == nn.Linear:
                 nn.init.orthogonal_(layer.weight.data, gain=gain)
                 layer.bias.data.fill_(0)
             else:
                 pass
             
         elif init_weight == 'xavier_uniform':
-            if type(layer) == nn.Conv2d or type(layer) == nn.Linear:
+            if type(layer) == nn.Conv2d:
+                nn.init.xavier_uniform_(layer.weight.data, gain=gain)
+
+            elif type(layer) == nn.Linear:
                 nn.init.xavier_uniform_(layer.weight.data, gain=gain)
                 layer.bias.data.fill_(0)
+
             else:
                 pass
             
@@ -222,9 +232,10 @@ class Model(ABC, nn.Module):
         the net independend of the chosen resultion
 
         Returns:
-            [type]: [description]
+            int: size of the flattend ccn output before linear layers
         """
-        return self.features(autograd.Variable(torch.zeros(1, *self.input_shape))).view(1, -1).size(1)
+        
+        return self.convultions(autograd.Variable(torch.zeros(1, * self.input_shape))).view(1, -1).size(1)
     
     
     

@@ -40,11 +40,6 @@ parser.add_argument("--scene",
                     type=str,
                     help="run a specific .cfg and .wad",
                     default="../wads/BasicAugment.cfg")
-parser.add_argument("--mode",
-                    type=str,
-                    help="run the network in train or evaluation mode",
-                    default="train",
-                    choices=["train", "eval"])
 parser.add_argument("--frame_repeat",
                     type=int,
                     help="repeat frame n times",
@@ -58,7 +53,7 @@ parser.add_argument("--model_name",
 parser.add_argument("--weights_dir",
                     type=str,
                     help="name of model to load",
-                    default='../models/DualQ_e=30_lr=schedCos_df=0.97.pth')
+                    default='../models/DuelQ_from_basic.pth')
 parser.add_argument("--text_file",
                     type=str,
                     help="name of model to load",
@@ -73,7 +68,7 @@ parser.add_argument("--model",
 parser.add_argument("--epochs",
                     type=int,
                     help="number of iterations to train network",
-                    default=10)
+                    default=1_000)
 parser.add_argument("--steps",
                     type=int,
                     help="number of steps per episode",
@@ -143,7 +138,7 @@ parser.add_argument("--save_model",
 parser.add_argument("--load_model",
                     type=bool,
                     help="load model before training",
-                    default=False)
+                    default=True)
 parser.add_argument("--skip_training",
                     type=bool,
                     help="skip training",
@@ -197,11 +192,16 @@ def test(game, agent, options):
     for _ in trange(options.test_episodes, leave=False):
         game.new_episode()
         while not game.is_episode_finished():
+            # gets the picture of what you would see in the game
             state = preprocess(game.get_state().screen_buffer, options.resultion)
+            # the image goes through the CNN and returns an index that correlates to a action in the game
             best_action_index, _, _ = agent.act(state)
+            # actually performing that action
             game.make_action(actions[best_action_index], options.frame_repeat)
-            
+        
+        # get the reward, changes of the action had a good/bad effect or a living penalty is in place
         reward = game.get_total_reward()
+        # log the score
         test_scores.append(reward)
 
     test_scores = np.array(test_scores)
@@ -260,7 +260,7 @@ def run(game, agent, actions, options):
         test(game, agent, options)
         if options.model_name and not (epoch%options.save_freq):
             print("Saving the network weights to:", options.model_name)
-            torch.save(agent.q_net, options.model_name)
+            torch.save(agent.q_net.state_dict(), options.model_name)
         print("Total elapsed time: %.2f minutes" % ((time() - start_time) / 60.0))
 
     game.close()
@@ -275,12 +275,12 @@ if __name__ == '__main__':
 
     # Initialize a game for each worker and actions
     if options.model == 'PPO':
-        games = [create_simple_game(options.scene) for i in range(options.n_workers)]
-        n = games[0].get_available_buttons_size()
+        game = [create_simple_game(options.scene) for i in range(options.n_workers)]
+        n = game[0].get_available_buttons_size()
     
     elif options.model == 'DQN':
-        games = create_simple_game(options.scene)
-        n = games.get_available_buttons_size()
+        game = create_simple_game(options.scene)
+        n = game.get_available_buttons_size()
     else:
         raise(NotImplementedError, "The only model options available are DQN and PPO.")
     
@@ -297,9 +297,9 @@ if __name__ == '__main__':
         agent = DQNAgent(options, len(actions), scheduler=True)
 
     # Run the training for the set number of epochs
-    if options.mode == 'train':
+    if options.skip_training == 'train':
         
-        agent, game = run(games, agent, actions, options)
+        agent, game = run(game, agent, actions, options)
 
         print("======================================")
         print("Training finished. It's time to watch!")
@@ -308,12 +308,12 @@ if __name__ == '__main__':
     game.close()
     game.set_window_visible(True)
     game.set_mode(Mode.ASYNC_PLAYER)
-    games.init()
+    game.init()
 
     for _ in range(options.watch_episodes):
-        games.new_episode()
+        game.new_episode()
         while not game.is_episode_finished():
-            state = preprocess(games.get_state().screen_buffer, options.resultion)
+            state = preprocess(game.get_state().screen_buffer, options.resultion)
             best_action_index, _, _ = agent.act(state)
 
             # Instead of make_action(a, frame_repeat) in order to make the animation smooth
