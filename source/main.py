@@ -120,16 +120,6 @@ parser.add_argument("--grad_clip",
                     help="magnitude bound for clipping gradients",
                     default=0.1)
 
-# LOGGING options
-parser.add_argument("--log_frequency",
-                    type=int,
-                    help="number of batches between each tensorboard log",
-                    default=100)
-parser.add_argument("--save_frequency",
-                    type=int,
-                    help="number of batches between each model save",
-                    default=1_000)
-
 # Training, Loading, Testing
 parser.add_argument("--save_model",
                     type=bool,
