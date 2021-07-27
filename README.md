@@ -112,6 +112,4 @@ In short we tried different hyperparameter combinations in different enviroments
 As you can see there are certain pikes in the reward based performance:
 ![Different Plots](https://user-images.githubusercontent.com/46927512/127165861-e5167b0c-4c64-4958-8afb-f92156f25123.png)
 
-
-
-Google Drive mit allen Modellen, Wads und was es sonst so zu dem Projekt gibt: [DOOM-Ordner](https://drive.google.com/drive/folders/1rHizC5ppqcJWElBOVd-HAEOcjqUoW5lT?usp=sharing)
+There also is an an Google Drive provided with project related data like metrics, wads and model files [DOOM-Folder](https://drive.google.com/drive/folders/1rHizC5ppqcJWElBOVd-HAEOcjqUoW5lT?usp=sharing)
